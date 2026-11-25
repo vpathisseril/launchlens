@@ -46,6 +46,21 @@ def _redact(params: dict[str, Any]) -> dict[str, Any]:
     return {k: ("***" if "key" in k.lower() else v) for k, v in params.items()}
 
 
+# Polite per-source pacing: NCBI E-utilities allow 3 req/s without a key; openFDA 240/min without a key.
+MIN_INTERVAL_S = {"pubmed": 0.4, "openfda": 0.3}
+_last_call: dict[str, float] = {}
+
+
+def _pace(source_key: str) -> None:
+    gap = MIN_INTERVAL_S.get(source_key)
+    if not gap:
+        return
+    wait = _last_call.get(source_key, 0.0) + gap - time.monotonic()
+    if wait > 0:
+        time.sleep(wait)
+    _last_call[source_key] = time.monotonic()
+
+
 def http_get_json(url: str, params: dict[str, Any] | None = None, headers: dict[str, str] | None = None,
                   retries: int = 3) -> Any:
     s = get_settings()
@@ -104,6 +119,7 @@ def cached_json(db: Session, source_key: str, url: str, params: dict[str, Any] |
     if done is not None:
         done.add(h)
     try:
+        _pace(source_key)
         payload = http_get_json(url, params, headers)
         if reducer is not None and payload is not None:
             payload = reducer(payload)

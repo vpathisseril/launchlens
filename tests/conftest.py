@@ -41,14 +41,19 @@ CMS_PRESC_PREV = "https://data.cms.gov/data-api/v1/dataset/presc-2022/data"
 CMS_SPEND_D = "https://data.cms.gov/data-api/v1/dataset/spend-d/data"
 CMS_SPEND_B = "https://data.cms.gov/data-api/v1/dataset/spend-b/data"
 
-CATALOG = {"dataset": [
-    {"title": "Medicare Part D Prescribers - by Provider and Drug", "distribution": [
-        {"format": "API", "accessURL": CMS_PRESC, "temporal": "2023-01-01/2023-12-31"},
-        {"format": "API", "accessURL": CMS_PRESC_PREV, "temporal": "2022-01-01/2022-12-31"}]},
-    {"title": "Medicare Part D Spending by Drug", "distribution": [
-        {"format": "API", "accessURL": CMS_SPEND_D, "temporal": "2023-01-01/2023-12-31"}]},
-    {"title": "Medicare Part B Spending by Drug", "distribution": [
-        {"format": "API", "accessURL": CMS_SPEND_B, "temporal": "2023-01-01/2023-12-31"}]},
+CATALOG = {"@type": "dcat:Catalog", "dataset": [  # 2026 shape: one dataset per year, dated title, temporal list
+    {"title": "Medicare Part D Prescribers - by Provider and Drug : 2023-12-01", "distribution": [
+        {"format": "API", "accessURL": CMS_PRESC, "temporal": [{"@type": "PeriodOfTime", "startDate": "2023-01-01",
+                                                                "endDate": "2023-12-31"}]},
+        {"mediaType": "text/csv", "downloadURL": "https://data.cms.gov/x.csv"}]},
+    {"title": "Medicare Part D Prescribers - by Provider and Drug : 2022-12-01", "distribution": [
+        {"format": "API", "accessURL": CMS_PRESC_PREV, "temporal": [{"startDate": "2022-01-01"}]}]},
+    {"title": "Medicare Part D Spending by Drug : 2023-01-01", "distribution": [
+        {"format": "API", "accessURL": CMS_SPEND_D, "temporal": [{"startDate": "2023-01-01"}]}]},
+    {"title": "Medicare Part B Spending by Drug : 2023-01-01", "distribution": [
+        {"accessURL": CMS_SPEND_B}]},  # no temporal → year from title suffix
+    {"title": "Medicare Part D Prescribers - by Provider", "distribution": [  # different dataset, must not match
+        {"accessURL": "https://data.cms.gov/data-api/v1/dataset/other/data"}]},
 ]}
 
 

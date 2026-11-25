@@ -42,27 +42,47 @@ def _num(v: Any) -> float | None:
 
 
 # ------------------------------------------------------------------ CMS (data.cms.gov data API)
+def _temporal_year(temporal: Any, title: str) -> str:
+    """Data year from `temporal` (string 'YYYY-MM-DD/…' or list of PeriodOfTime objects) or the title's date suffix."""
+    if isinstance(temporal, list) and temporal:
+        first = temporal[0]
+        val = str(first.get("startDate", "")) if isinstance(first, dict) else str(first)
+    else:
+        val = str(temporal or "")
+    if val[:4].isdigit():
+        return val[:4]
+    m = re.search(r":\s*(\d{4})-\d{2}-\d{2}\s*$", title)
+    return m.group(1) if m else ""
+
+
 def _reduce_catalog(payload: Any) -> dict[str, list[list[str]]]:
+    """Map each wanted base title to [(year, api_url)] newest first.
+
+    Handles both catalog shapes: one dataset with many dated distributions (legacy) and one dataset per data year
+    whose title carries a date suffix, e.g. 'Medicare Part D Prescribers - by Provider and Drug : 2024-12-01' (2026).
+    """
     out: dict[str, list[list[str]]] = {}
     wanted = set(CMS_TITLES.values())
-    for ds in payload.get("dataset", []):
-        title = ds.get("title", "")
-        if title not in wanted:
+    for ds in payload.get("dataset", []) if isinstance(payload, dict) else []:
+        title = str(ds.get("title", ""))
+        base = title.split(" : ")[0].strip()
+        if base not in wanted:
             continue
-        dists = []
-        for d in ds.get("distribution", []):
-            url = d.get("accessURL", "")
-            if d.get("format") == "API" and "/data-api/v1/dataset/" in url:
-                temporal = str(d.get("temporal", ""))
-                year = temporal[:4] if temporal[:4].isdigit() else ""
-                dists.append([year, url])
-        out[title] = sorted(dists, key=lambda x: x[0], reverse=True)
+        for d in ds.get("distribution", []) or []:
+            url = str(d.get("accessURL") or d.get("downloadURL") or "")
+            if "/data-api/v1/dataset/" not in url:
+                continue
+            year = _temporal_year(d.get("temporal") or ds.get("temporal"), title)
+            out.setdefault(base, []).append([year, url])
+    for base in out:
+        out[base] = sorted(out[base], key=lambda x: x[0], reverse=True)
     return out
 
 
 def cms_distributions(db: Session, source_key: str) -> list[tuple[str, str]]:
     """Returns [(year, api_url)] newest first for a CMS dataset title."""
-    cat, _ = cached_json(db, "cms_catalog", CMS_CATALOG, ttl_hours=24 * 7, reducer=_reduce_catalog)
+    cat, _ = cached_json(db, "cms_catalog", CMS_CATALOG, ttl_hours=24 * 7, reducer=_reduce_catalog,
+                         locator="catalog v2 (per-year datasets)")
     rows = (cat or {}).get(CMS_TITLES[source_key], [])
     seen, out = set(), []
     for year, url in rows:
