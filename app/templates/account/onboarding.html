@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Set up AI access{% endblock %}
+{% block body %}
+<main id="main" class="section" style="max-width:980px">
+  <div class="wizard-steps" aria-hidden="true"><span class="on"></span><span class="on"></span><span></span></div>
+  <div class="page-head"><div><div class="page-head eyebrow" style="margin:0">Step 2 of 3 · Required</div>
+    <h1>Set up your AI access</h1>
+    <p>LaunchLens's research agents run on your own AI provider account. Choose one option to continue. You can change it later in Settings → AI access.</p></div></div>
+  {% if error %}<div class="alert err" role="alert"><i data-lucide="alert-circle"></i>{{ error }}</div><br>{% endif %}
+  {% if request.query_params.get('err') == 'default' %}<div class="alert err">Tick the confirmation box. If the shared key isn't available, add your own key.</div><br>{% endif %}
+  <div class="grid g2">
+    <div class="card">
+      <div class="card-head"><span class="pill pill-ok">Recommended · unlimited</span></div>
+      <h3><i data-lucide="key-round"></i>Use my own API key</h3>
+      <p class="muted small">We check the key with a free model-list call (no tokens used), encrypt it at rest with Fernet, and only ever show the last 4 characters. There are no usage limits on your key.</p>
+      <form method="post" action="/onboarding/ai-keys/byok">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="back" value="/app">
+        <div class="field"><label for="provider">Provider</label>
+          <select id="provider" name="provider">{% for p in providers %}<option value="{{ p }}">{{ labels[p] }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="api_key">API key</label><input id="api_key" name="api_key" type="password" required autocomplete="off" placeholder="Paste your key">
+          <div class="hint">Your key is used only for your own research calls.</div></div>
+        <div class="field"><label for="label">Label (optional)</label><input id="label" name="label" type="text" placeholder="e.g. Personal"></div>
+        <button class="btn primary"><i data-lucide="shield-check"></i>Validate & save</button>
+      </form>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="pill pill-warn">Limited</span></div>
+      <h3><i data-lucide="users"></i>Use the shared default key</h3>
+      {% if default_available %}
+        {% for p in default_available %}{% set pol = policies[p] %}
+        <ul class="small">
+          <li>Provider: <strong>{{ labels[p] }}</strong></li>
+          <li>Models: <span class="mono">{{ pol.model_allowlist|join(', ') }}</span> (economy tier only)</li>
+          <li>Up to <strong>{{ pol.max_tokens_per_call }}</strong> output tokens per call</li>
+          <li><strong>{{ pol.calls_per_day }}</strong> research calls per day</li>
+        </ul>
+        {% endfor %}
+        <form method="post" action="/onboarding/ai-keys/default">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <label class="check"><input type="checkbox" name="understand"> I understand the shared key is limited, and that I can add my own key at any time for unlimited use.</label><br>
+          <button class="btn"><i data-lucide="arrow-right"></i>Continue with the shared key</button>
+        </form>
+      {% else %}
+        <p class="muted small">The administrator hasn't turned on a shared key. Add your own key to continue.</p>
+      {% endif %}
+    </div>
+  </div>
+</main>
+{% endblock %}

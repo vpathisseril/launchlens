@@ -1,0 +1,19 @@
+{% from "_macros.html" import lineage, pin_form %}
+{% if error %}
+<div class="answer"><div class="alert {{ 'warn' if quota else 'err' }}"><i data-lucide="{{ 'gauge' if quota else 'alert-circle' }}"></i>
+  <div>{{ error }}{% if quota %}<br><a class="btn sm primary" href="/account/ai" style="margin-top:8px"><i data-lucide="key-round"></i>Add your own key</a>{% endif %}</div></div></div>
+{% else %}
+<div class="answer">
+  <div class="q"><i data-lucide="message-circle-question"></i> {{ question }}</div>
+  <div class="prose">{{ ans.answer_md|md|safe }}</div>
+  <div class="meta">
+    {% if ans.verified %}<span class="pill pill-ok"><i data-lucide="badge-check"></i>Citations verified</span>
+    {% else %}<span class="pill pill-warn" title="{{ ans.notes }}"><i data-lucide="triangle-alert"></i>Verify: {{ ans.notes[:80] }}</span>{% endif %}
+    <span class="pill">{{ ans.model }} · {{ 'own key' if ans.key_type == 'byok' else 'shared key' }}</span>
+    {% if ans.notice %}<span class="pill pill-warn">{{ ans.notice }}</span>{% endif %}
+    <span class="pill">tools: {{ ans.tools_used|join(', ') }}</span>
+  </div>
+  <br>{{ lineage(ans.citations) }}
+  <br>{{ pin_form(hub_key, question[:200], ans.answer_md, ans.citations, None, projects, csrf_token) }}
+</div>
+{% endif %}

@@ -1,0 +1,29 @@
+{% extends "app_shell.html" %}
+{% block title %}Agents{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="eyebrow">Agent Builder</div><h1>Your research agents</h1>
+  <p>Start from a hub template, then tune its persona, model, tone and tools. Platform guardrails (cite everything, stay neutral, no advice) always apply and can't be edited.</p></div></div>
+<h4>Templates</h4>
+<div class="grid g3">
+  {% for a in tpls %}
+  <div class="card">
+    <div class="card-head"><span class="hub-tile" style="gap:0"><span class="icon-wrap"><i data-lucide="{{ a.icon }}"></i></span></span><div><h3 style="margin:0">{{ a.name }}</h3><div class="tiny muted">{{ a.hub_key or 'cross-hub' }} · {{ a.tools|length }} tools</div></div></div>
+    <p class="small muted">{{ a.goal }}</p>
+    <form method="post" action="/agents/clone/{{ a.id }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn sm primary"><i data-lucide="copy-plus"></i>Customize</button></form>
+  </div>
+  {% endfor %}
+</div>
+<br><h4>My agents</h4>
+{% if mine %}
+<div class="grid g3">{% for a in mine %}
+  <div class="card"><h3><i data-lucide="{{ a.icon }}"></i><a href="/agents/{{ a.id }}">{{ a.name }}</a></h3>
+    <div class="tiny muted">{{ a.provider }} · {{ a.model or 'default model' }} · {{ a.tone }} · {{ a.tools|length }} tools</div></div>
+{% endfor %}</div>
+{% else %}<div class="card"><p class="muted small">Customize a template to create your first agent. You can pick it from the agent menu on any hub page.</p></div>{% endif %}
+{% if runs %}
+<br><h4>Recent runs</h4>
+<div class="table-wrap"><table><thead><tr><th>When</th><th>Hub</th><th>Question</th><th>Verified</th></tr></thead><tbody>
+{% for r in runs %}<tr><td>{{ r.at.strftime('%m-%d %H:%M') }}</td><td>{{ r.hub_key }}</td><td>{{ r.question[:100] }}</td><td>{{ '✓' if r.verified else '⚠' }}</td></tr>{% endfor %}
+</tbody></table></div>
+{% endif %}
+{% endblock %}

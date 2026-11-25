@@ -1,0 +1,11 @@
+{% extends "app_shell.html" %}
+{% block title %}Audit log{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="eyebrow">Admin</div><h1>Audit log</h1><p>Who did what, when, with before/after values. Showing the latest 300 entries.</p></div>
+  <div class="spacer"></div><form class="row" method="get"><select name="action" aria-label="Filter action"><option value="">All actions</option>{% for a in actions %}<option {{ 'selected' if a == action }}>{{ a }}</option>{% endfor %}</select><button class="btn sm">Filter</button></form>
+  <a class="btn sm" href="/admin/export/audit.csv"><i data-lucide="download"></i>CSV</a></div>
+<div class="table-wrap" style="max-height:none"><table><thead><tr><th>When (UTC)</th><th>Actor</th><th>Action</th><th>Entity</th><th>Before</th><th>After</th><th>IP</th></tr></thead><tbody>
+{% for r in rows %}<tr><td class="mono small">{{ r.at.strftime('%Y-%m-%d %H:%M:%S') }}</td><td>{{ r.actor_id or 'system' }}</td><td><span class="pill">{{ r.action }}</span></td><td>{{ r.entity }} {{ r.entity_id }}</td>
+  <td class="tiny mono">{{ r.before|tojson if r.before }}</td><td class="tiny mono">{{ r.after|tojson if r.after }}</td><td class="tiny">{{ r.ip }}</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

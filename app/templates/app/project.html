@@ -1,0 +1,54 @@
+{% extends "app_shell.html" %}
+{% from "_macros.html" import lineage %}
+{% block title %}{{ p.title }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="eyebrow">Research project</div><h1>{{ p.title }}</h1>
+  <p>{{ p.findings|length }} findings across hubs. Generate an AI executive brief (citations verified) or a no-AI summary.</p></div>
+  <div class="spacer"></div>
+  <form method="post" action="/projects/{{ p.id }}/brief" class="row"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="btn" name="mode" value="manual"><i data-lucide="list"></i>Summary (no AI)</button>
+    <button class="btn primary" name="mode" value="ai"><i data-lucide="sparkles"></i>Generate executive brief</button></form>
+</div>
+{% set err = request.query_params.get('err') %}
+{% if err == 'empty' %}<div class="alert warn">Pin at least one finding first.</div><br>
+{% elif err %}<div class="alert err">The AI brief couldn't be generated ({{ err }}). Check <a href="/account/ai">AI access</a> or use the no-AI summary.</div><br>{% endif %}
+
+<div class="kanban">
+  {% for hk, items in by_hub.items() %}{% set h = hubs.get(hk) %}
+  <div class="col">
+    <h4><i data-lucide="{{ h.info.icon if h else 'box' }}"></i> {{ h.info.short if h else hk }} · {{ items|length }}</h4>
+    {% for f in items %}
+    <div class="finding">
+      <h5>{{ f.title }}</h5>
+      {% if f.body_md %}<div class="prose small">{{ (f.body_md[:600] ~ ('…' if f.body_md|length > 600 else ''))|md|safe }}</div>{% endif %}
+      {% if f.chart_spec %}<div class="chart short" data-chart="{{ f.chart_spec|tojson_attr }}" role="img" aria-label="{{ f.title }}"></div>{% endif %}
+      {{ lineage(f.citations) }}
+      <div class="row" style="margin-top:8px">
+        <form method="post" action="/projects/{{ p.id }}/findings/{{ f.id }}/move"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="direction" value="up"><button class="btn sm ghost" aria-label="Move up"><i data-lucide="arrow-up"></i></button></form>
+        <form method="post" action="/projects/{{ p.id }}/findings/{{ f.id }}/move"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="direction" value="down"><button class="btn sm ghost" aria-label="Move down"><i data-lucide="arrow-down"></i></button></form>
+        <form method="post" action="/projects/{{ p.id }}/findings/{{ f.id }}/delete"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn sm ghost danger" aria-label="Remove finding"><i data-lucide="trash-2"></i></button></form>
+      </div>
+    </div>
+    {% else %}<p class="tiny muted">Nothing pinned from this hub yet.</p>{% endfor %}
+  </div>
+  {% endfor %}
+</div>
+
+<div class="grid g2" style="margin-top:18px">
+  <div class="card">
+    <h3><i data-lucide="notebook-pen"></i>Notes</h3>
+    <form method="post" action="/projects/{{ p.id }}/notes"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <textarea name="notes" aria-label="Project notes" placeholder="Hypotheses, open questions, next steps…">{{ p.notes_md }}</textarea><br>
+      <button class="btn sm"><i data-lucide="save"></i>Save notes</button></form>
+  </div>
+  <div class="card" id="briefs">
+    <h3><i data-lucide="file-text"></i>Briefs</h3>
+    {% for b in briefs %}
+      <div class="finding row"><strong>v{{ b.version }}</strong><span class="tiny muted">{{ b.created_at.strftime('%Y-%m-%d %H:%M') }} · {{ b.generated_by_model }}</span><div class="spacer"></div>
+        <a class="btn sm" href="/briefs/{{ b.id }}/print"><i data-lucide="printer"></i>View / PDF</a>
+        <a class="btn sm" href="/briefs/{{ b.id }}/edit"><i data-lucide="pencil"></i>Edit</a>
+        <a class="btn sm" href="/briefs/{{ b.id }}.md"><i data-lucide="download"></i>.md</a></div>
+    {% else %}<p class="muted small">No briefs yet.</p>{% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Access needed{% endblock %}
+{% block body %}
+<main id="main" class="auth-wrap" style="max-width:560px">
+  <div class="card" style="text-align:center">
+    <h2>{% if module %}This hub isn't enabled for you yet{% else %}Not allowed{% endif %}</h2>
+    <p class="muted">{% if module %}Your administrator controls which research hubs you can use. Ask them to grant the <strong>{{ module }}</strong> module.{% else %}{{ detail }}{% endif %}</p>
+    <a class="btn primary" href="/app"><i data-lucide="layout-dashboard"></i>Back to Command Center</a>
+  </div>
+</main>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "app_shell.html" %}
+{% block title %}Research scope{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="eyebrow">Research scope</div><h1>Define the market you're researching</h1>
+  <p>Every hub uses this scope. Pick a starter preset for any therapeutic area or enter your own competitor set (generic names work best with CMS data).</p></div></div>
+<div class="grid g3">
+  <div class="card">
+    <h3><i data-lucide="wand-sparkles"></i>Starter presets</h3>
+    <form method="post" action="/scope"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="apply_preset" value="1">
+      {% for k, p in presets.items() %}
+      <label class="check" style="margin-bottom:10px"><input type="radio" name="preset" value="{{ k }}" {{ 'checked' if scope.preset == k or (not scope.preset and loop.first) }}>
+        <span>{{ p.label }}<br><span class="tiny muted">{{ p.drugs|join(', ') }}</span></span></label>
+      {% endfor %}
+      <button class="btn primary"><i data-lucide="check"></i>Apply preset</button></form>
+  </div>
+  <div class="card span2">
+    <h3><i data-lucide="sliders-horizontal"></i>Custom scope</h3>
+    <form method="post" action="/scope"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="grid g2">
+        <div class="field"><label for="ta">Therapeutic area</label><input id="ta" name="therapeutic_area" type="text" value="{{ scope.therapeutic_area }}" placeholder="e.g. Oncology"></div>
+        <div class="field"><label for="ind">Indication (as written on FDA labels)</label><input id="ind" name="indication" type="text" value="{{ scope.indication }}" placeholder="e.g. breast cancer"></div>
+      </div>
+      <div class="field"><label for="drugs">Competitor set — generic names, comma-separated (max 8)</label>
+        <textarea id="drugs" name="drugs" placeholder="palbociclib, ribociclib, abemaciclib">{{ scope.drugs|join(', ') }}</textarea>
+        <div class="hint">Use CMS generic names (e.g. "sacubitril/valsartan"). Competitor Discovery in the Differentiation hub suggests more.</div></div>
+      <div class="grid g2">
+        <div class="field"><label for="pm">Prevalence measure (CDC PLACES)</label>
+          <select id="pm" name="places_measure">{% for k, v in measures.items() %}<option value="{{ k }}" {{ 'selected' if scope.places_measure == k }}>{{ v }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="st">Focus states (optional; narrows prescriber data)</label>
+          <select id="st" name="states" multiple size="5">{% for s in states %}<option {{ 'selected' if s in scope.states }}>{{ s }}</option>{% endfor %}</select>
+          <div class="hint">Leave empty for national. Hold Ctrl/⌘ to select several.</div></div>
+      </div>
+      <button class="btn primary"><i data-lucide="save"></i>Save scope</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "app_shell.html" %}
+{% block title %}Edit brief{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="eyebrow">{{ p.title }}</div><h1>Edit brief v{{ b.version }}</h1><p>Markdown. Keep the disclaimer, the sources and the signature.</p></div></div>
+<form method="post" action="/briefs/{{ b.id }}/edit" class="card"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <textarea name="content" style="min-height:60vh;font-family:'JetBrains Mono',monospace;font-size:.85rem" aria-label="Brief markdown">{{ b.content_md }}</textarea><br>
+  <div class="row"><button class="btn primary"><i data-lucide="save"></i>Save & preview</button><a class="btn" href="/projects/{{ p.id }}">Cancel</a></div>
+</form>
+{% endblock %}

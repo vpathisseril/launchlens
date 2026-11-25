@@ -1,0 +1,21 @@
+{% extends "app_shell.html" %}
+{% block title %}Usage & analytics{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="eyebrow">Admin</div><h1>Usage & analytics</h1><p>AI usage, cost, latency and research quality per hub.</p></div>
+  <div class="spacer"></div>{% for d in (7,30,90) %}<a class="btn sm {{ 'primary' if days == d }}" href="?days={{ d }}">{{ d }}d</a>{% endfor %}
+  <a class="btn sm" href="/admin/export/usage.csv"><i data-lucide="download"></i>CSV</a></div>
+<div class="grid g5">
+  <div class="card"><div class="kpi"><div class="kpi-label">AI calls</div><div class="kpi-value">{{ n }}</div><span class="tiny muted">own keys {{ byok }} · shared {{ default }}</span></div></div>
+  <div class="card"><div class="kpi"><div class="kpi-label">p50 latency</div><div class="kpi-value">{{ (p50/1000)|round(1) }}s</div></div></div>
+  <div class="card"><div class="kpi"><div class="kpi-label">p95 latency</div><div class="kpi-value">{{ (p95/1000)|round(1) }}s</div></div></div>
+  <div class="card"><div class="kpi"><div class="kpi-label">Error rate</div><div class="kpi-value">{{ '%.1f'|format(err_rate) }}%</div></div></div>
+  <div class="card"><div class="kpi"><div class="kpi-label">Window</div><div class="kpi-value">{{ days }}d</div></div></div>
+</div>
+<div class="grid g2" style="margin-top:18px">
+  <div class="card"><h3>Cost by model (USD)</h3><div class="chart" data-chart="{{ cost_chart|tojson_attr }}"></div></div>
+  <div class="card"><h3>Calls by hub</h3><div class="chart" data-chart="{{ hub_chart|tojson_attr }}"></div></div>
+</div>
+<div class="card" style="margin-top:18px"><h3><i data-lucide="heart-pulse"></i>Hub health</h3>
+  <div class="table-wrap"><table><thead><tr><th>Hub</th><th class="num">Agent answers</th><th class="num">Citation-verifier pass rate</th><th class="num">Avg rating</th></tr></thead><tbody>
+  {% for r in hub_health %}<tr><td>{{ r[0] }}</td><td class="num">{{ r[1] }}</td><td class="num">{{ r[2] }}</td><td class="num">{{ r[3] }}</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

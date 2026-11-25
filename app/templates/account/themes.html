@@ -1,0 +1,16 @@
+{% extends "app_shell.html" %}
+{% block title %}Themes{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="eyebrow">Settings</div><h1>Themes</h1><p>Four executive themes, from beginner to advanced. Every theme meets WCAG AA contrast.</p></div></div>
+<div class="grid g4">
+  {% for key, name, level in themes %}
+  <div class="card" data-theme="{{ key }}" style="background:var(--surface);color:var(--text)">
+    <h3>{{ name }}</h3><div class="small muted">{{ level }}</div>
+    <div class="theme-swatch"><i style="background:var(--primary)"></i><i style="background:var(--accent)"></i><i style="background:var(--bg)"></i><i style="background:var(--success)"></i><i style="background:var(--warning)"></i></div>
+    <div class="kpi"><div class="kpi-label">Sample KPI</div><div class="kpi-value">72/100</div><span class="delta up">▲ +4.2</span></div><br>
+    <form method="post" action="/account/theme"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="theme" value="{{ key }}">
+      <button class="btn {{ 'primary' if theme == key }}">{% if theme == key %}<i data-lucide="check"></i>Active{% else %}Use {{ name }}{% endif %}</button></form>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

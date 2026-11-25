@@ -1,0 +1,6 @@
+/* T2 — Executive Slate (Intermediate · boardroom) */
+[data-theme="executive-slate"]{--bg:#F4F5F7;--surface:#FFFFFF;--surface-2:#EEF0F3;--text:#111827;--muted:#6B7280;--border:#D1D5DB;
+--primary:#0B2545;--primary-ink:#FFFFFF;--accent:#C9A227;--success:#166534;--warning:#A16207;--danger:#991B1B;
+--hero:linear-gradient(135deg,#0B2545 0%,#13315C 100%);--header:#0B2545;--header-ink:#F8FAFC;
+--chart:#0B2545,#C9A227,#8DA9C4,#13315C,#6B7280,#B45309;--seq:#E8EEF5,#0B2545;--div:#991B1B,#F9FAFB,#166534;--shadow:0 1px 2px rgba(17,24,39,.08),0 6px 18px rgba(17,24,39,.08)}
+[data-theme="executive-slate"] .hero h1,[data-theme="executive-slate"] .hero p,[data-theme="executive-slate"] .hero .eyebrow{color:#F8FAFC}

@@ -1,0 +1,22 @@
+{% extends "app_shell.html" %}
+{% block title %}Users & access{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="eyebrow">Admin</div><h1>Users & access</h1><p>Grant research hubs per user. Changes take effect on the user's next page load and are audited.</p></div>
+  <div class="spacer"></div><form class="row" method="get"><input type="text" name="q" value="{{ q }}" placeholder="Search name or email" aria-label="Search"><button class="btn sm">Search</button></form>
+  <a class="btn sm" href="/admin/export/users.csv"><i data-lucide="download"></i>CSV</a></div>
+<div class="table-wrap" style="max-height:none"><table><thead><tr><th>User</th><th>Status</th><th>AI</th><th>Modules</th><th></th></tr></thead><tbody>
+{% for u in rows %}
+<tr>
+  <td><strong>{{ u.name }}</strong><br><span class="tiny muted">{{ u.email }} · {{ u.role.value }}</span></td>
+  <td><span class="pill {{ 'pill-ok' if u.status.value == 'approved' else 'pill-warn' if u.status.value == 'pending' else 'pill-bad' }}">{{ u.status.value }}</span><br><span class="tiny muted">{{ u.approval_source or '' }}</span></td>
+  <td class="small">{{ u.ai_key_status.value.replace('_',' ') }}</td>
+  <td><form method="post" action="/admin/users/{{ u.id }}/modules" class="row"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% for m in mods %}<label class="check small" style="margin:0 8px 0 0"><input type="checkbox" name="module" value="{{ m.id }}" {{ 'checked' if m.id in grants[u.id] }}>{{ m.key }}</label>{% endfor %}
+    <button class="btn sm"><i data-lucide="save"></i></button></form></td>
+  <td>{% if u.id != user.id and u.status.value in ('approved','suspended') %}
+    <form method="post" action="/admin/users/{{ u.id }}/status"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="status" value="{{ 'suspended' if u.status.value == 'approved' else 'approved' }}">
+      <button class="btn sm {{ 'danger' if u.status.value == 'approved' }}">{{ 'Suspend' if u.status.value == 'approved' else 'Reactivate' }}</button></form>{% endif %}</td>
+</tr>
+{% endfor %}</tbody></table></div>
+{% endblock %}

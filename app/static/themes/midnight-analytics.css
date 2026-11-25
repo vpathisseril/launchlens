@@ -1,0 +1,5 @@
+/* T4 — Midnight Analytics (Advanced · dark) */
+[data-theme="midnight-analytics"]{--bg:#0B1220;--surface:#111A2E;--surface-2:#16213A;--text:#E5EAF5;--muted:#94A3B8;--border:#1E2A44;
+--primary:#38BDF8;--primary-ink:#04121F;--accent:#2DD4BF;--success:#34D399;--warning:#FBBF24;--danger:#F87171;
+--hero:linear-gradient(135deg,#0B1220 0%,#102A43 100%);--header:#0E172A;--header-ink:#E5EAF5;
+--chart:#38BDF8,#2DD4BF,#A78BFA,#FBBF24,#94A3B8,#F472B6;--seq:#16213A,#38BDF8;--div:#F87171,#16213A,#34D399;--shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);color-scheme:dark}

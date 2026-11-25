@@ -1,0 +1,57 @@
+{% extends "app_shell.html" %}
+{% from "_macros.html" import kpi %}
+{% block title %}Command Center{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="eyebrow">Command Center</div><h1>Good to see you, {{ user.name.split(' ')[0] }}.</h1>
+    <p>Five research hubs, ranked by 2026 market demand. Each tile reflects your current research scope.</p></div>
+  <div class="spacer"></div>
+  <a class="btn" href="/scope"><i data-lucide="sliders-horizontal"></i>Edit scope</a>
+  <a class="btn primary" href="/projects"><i data-lucide="folder-plus"></i>Projects</a>
+</div>
+
+<div class="scope-bar">
+  <i data-lucide="target"></i><strong>Scope</strong>
+  {% if scope.drugs %}
+    {% if scope.therapeutic_area %}<span class="chip">{{ scope.therapeutic_area }}</span>{% endif %}
+    {% if scope.indication %}<span class="chip"><i data-lucide="stethoscope"></i>{{ scope.indication }}</span>{% endif %}
+    {% for d in scope.drugs %}<span class="chip"><i data-lucide="pill"></i>{{ d }}</span>{% endfor %}
+    {% if scope.states %}<span class="chip"><i data-lucide="map-pin"></i>{{ scope.states|join(', ') }}</span>{% endif %}
+  {% else %}
+    <span class="muted">No scope yet — start with a preset:</span>
+    <form method="post" action="/scope" class="row">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="apply_preset" value="1">
+      <select name="preset" style="width:auto">{% for k, p in presets.items() %}<option value="{{ k }}">{{ p.label }}</option>{% endfor %}</select>
+      <button class="btn sm primary">Apply</button>
+    </form>
+  {% endif %}
+</div>
+
+<div class="grid g5">
+  {% for t in tiles %}{% set h = t.hub %}
+  <a class="card hub-tile" href="/hubs/{{ h.info.key }}">
+    <span class="rank-chip">#{{ h.info.rank }}</span>
+    <span class="icon-wrap"><i data-lucide="{{ h.info.icon }}"></i></span>
+    <h3>{{ h.info.short }}</h3>
+    {% for k in t.kpis[:1] %}{{ kpi(k) }}{% endfor %}
+    {% if t.error %}<span class="fresh bad"><i></i>{{ t.error[:60] }}</span>
+    {% elif t.changes %}<span class="fresh warn"><i></i>{{ t.changes }} change{{ 's' if t.changes != 1 }} this week</span>
+    {% else %}<span class="fresh"><i></i>Up to date</span>{% endif %}
+  </a>
+  {% endfor %}
+</div>
+
+<div class="grid g3" style="margin-top:18px">
+  <div class="card span2">
+    <div class="card-head"><h3><i data-lucide="pin"></i>Recent findings</h3><div class="spacer"></div><a class="small" href="/projects">All projects →</a></div>
+    {% if recent %}
+      {% for f in recent %}<div class="finding"><h5>{{ f.title }}</h5><div class="tiny muted">{{ f.hub_key|capitalize }} · {{ f.created_at.strftime('%b %d') }} · {{ f.citations|length }} source{{ 's' if f.citations|length != 1 }}</div></div>{% endfor %}
+    {% else %}<p class="muted small">Pin charts and agent answers from any hub to build your evidence base, then generate an executive brief.</p>{% endif %}
+  </div>
+  <div class="card">
+    <div class="card-head"><h3><i data-lucide="bell"></i>Alerts</h3><div class="spacer"></div><a class="small" href="/notifications">All →</a></div>
+    {% if notes %}{% for n in notes %}<div class="finding"><a href="{{ n.url or '/notifications' }}">{{ n.title }}</a><div class="tiny muted">{{ n.body }}</div></div>{% endfor %}
+    {% else %}<p class="muted small">Watch a drug or policy topic from a hub and you'll be alerted when official data changes.</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

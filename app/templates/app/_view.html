@@ -1,0 +1,29 @@
+{% from "_macros.html" import kpi, lineage, data_table, pin_form %}
+<div class="card">
+  <div class="card-head"><h3>{{ res.title }}</h3><div class="spacer"></div>
+    {% if res.citations and (res.chart or res.table) %}{{ pin_form(hub.info.key, res.title, res.insight, cites, res.chart, projects, csrf_token) }}{% endif %}
+  </div>
+  {% if res.empty %}
+    <div class="alert"><i data-lucide="info"></i><div>{{ res.empty }}{% if 'scope' in res.empty %} <a href="/scope">Set scope →</a>{% endif %}</div></div>
+  {% else %}
+    {% if res.insight %}<div class="insight"><i data-lucide="lightbulb"></i><div>{{ res.insight }}</div></div>{% endif %}
+    {% if res.kpis %}<div class="grid g4" style="margin-bottom:12px">{% for k in res.kpis %}<div class="card flat">{{ kpi(k) }}</div>{% endfor %}</div>{% endif %}
+    {% if hub.info.key == 'targeting' and res.id in ('deciles','whitespace','segments') %}
+    <form class="card flat" data-weights hx-get="/hubs/targeting/view/{{ res.id }}" hx-target="#view" hx-trigger="change delay:400ms" style="margin-bottom:14px">
+      <div class="row" style="justify-content:space-between"><strong class="small">Scoring weights</strong><span class="pill pill-ok" data-total>100%</span></div>
+      <div class="grid g6" style="margin-top:8px">
+        {% for k, lbl in [('volume','Volume'),('growth','Growth'),('need','Need'),('access','Access'),('vulnerability','Openness'),('engagement','Engagement')] %}
+        {% set v = params.get('w_' ~ k) or {'volume':25,'growth':20,'need':15,'access':20,'vulnerability':10,'engagement':10}[k] %}
+        <div><label for="w_{{ k }}" class="tiny">{{ lbl }} <span data-out="w_{{ k }}" class="mono">{{ v|int }}%</span></label>
+          <input id="w_{{ k }}" type="range" name="w_{{ k }}" min="0" max="60" step="5" value="{{ v|int }}" style="width:100%"></div>
+        {% endfor %}
+      </div>
+    </form>
+    {% endif %}
+    {% if res.chart %}<div class="chart {{ 'tall' if res.id in ('geo','whitespace','radar','pipeline') }}" data-chart="{{ res.chart|tojson_attr }}" role="img" aria-label="{{ res.title }} chart"></div>{% endif %}
+    {% if res.banner %}<div class="banner"><i data-lucide="triangle-alert"></i> {{ res.banner }}</div>{% endif %}
+    {% if res.table %}<br>{{ data_table(res.table) }}{% endif %}
+  {% endif %}
+  {% if res.banner and res.empty %}<div class="banner">{{ res.banner }}</div>{% endif %}
+  <br>{{ lineage(res.citations) }}
+</div>

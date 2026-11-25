@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Request access{% endblock %}
+{% block body %}
+<main id="main" class="auth-wrap" style="max-width:560px">
+  <div class="card">
+    <h2>Request access</h2>
+    <p class="muted small">An administrator reviews requests within 24 hours. Depending on settings, access may also be granted automatically.</p>
+    {% if error %}<div class="alert err" role="alert"><i data-lucide="alert-circle"></i>{{ error }}</div><br>{% endif %}
+    <form method="post" action="/signup" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="grid g2">
+        <div class="field"><label for="name">Full name</label><input id="name" name="name" type="text" required value="{{ form.name or '' }}" autocomplete="name"></div>
+        <div class="field"><label for="email">Work email</label><input id="email" name="email" type="email" required value="{{ form.email or '' }}" autocomplete="email"></div>
+        <div class="field"><label for="org">Organization</label><input id="org" name="org" type="text" value="{{ form.org or '' }}" autocomplete="organization"></div>
+        <div class="field"><label for="title">Title</label><input id="title" name="title" type="text" value="{{ form.title or '' }}" autocomplete="organization-title"></div>
+      </div>
+      <div class="field"><label for="use_case">Primary use case</label>
+        <select id="use_case" name="use_case">{% for u in use_cases %}<option {{ 'selected' if form.use_case == u }}>{{ u }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="password">Password</label><input id="password" name="password" type="password" required minlength="12" autocomplete="new-password">
+        <div class="hint">At least 12 characters, using at least three of: lowercase, uppercase, numbers, symbols.</div></div>
+      <label class="check"><input type="checkbox" name="terms"> I understand LaunchLens is a research prototype using public data only. It is not promotional material and not legal, financial, or medical advice.</label>
+      <br><button class="btn primary lg" style="width:100%;justify-content:center"><i data-lucide="send"></i>Request access</button>
+    </form>
+    <p class="small muted" style="margin-top:14px">Already approved? <a href="/login">Sign in</a></p>
+  </div>
+</main>
+{% endblock %}

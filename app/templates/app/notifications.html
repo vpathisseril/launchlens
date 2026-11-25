@@ -1,0 +1,14 @@
+{% extends "app_shell.html" %}
+{% block title %}Alerts{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="eyebrow">Workspace</div><h1>Alerts & watchlist</h1><p>You'll be alerted when official data mentions something you watch.</p></div></div>
+<div class="grid g3">
+  <div class="card span2"><h3><i data-lucide="bell"></i>Alerts</h3>
+    {% for n in rows %}<div class="finding"><a href="{{ n.url or '#' }}">{{ n.title }}</a><div class="tiny muted">{{ n.body }} · {{ n.created_at.strftime('%Y-%m-%d %H:%M') }}</div></div>
+    {% else %}<p class="muted small">No alerts yet.</p>{% endfor %}</div>
+  <div class="card"><h3><i data-lucide="eye"></i>Watching</h3>
+    {% for w in watch %}<div class="row" style="margin-bottom:6px"><span class="chip">{{ w.kind.replace('_',' ') }}: {{ w.ref }}</span>
+      <form hx-post="/watch" hx-target="closest .row" hx-swap="outerHTML"><input type="hidden" name="kind" value="{{ w.kind }}"><input type="hidden" name="ref" value="{{ w.ref }}"><button class="btn sm ghost">Stop</button></form></div>
+    {% else %}<p class="muted small">Use the Watch buttons on a hub page.</p>{% endfor %}</div>
+</div>
+{% endblock %}

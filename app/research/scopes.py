@@ -1,0 +1,23 @@
+"""Starter scopes for any therapeutic area. Generic names follow CMS 'Gnrc_Name' conventions; users can edit freely."""
+PRESETS: dict[str, dict] = {
+    "oncology-cdk46": {"label": "Oncology · HR+/HER2− breast cancer (CDK4/6 inhibitors)", "therapeutic_area": "Oncology",
+                       "indication": "breast cancer", "drugs": ["palbociclib", "ribociclib", "abemaciclib"],
+                       "places_measure": "CANCER"},
+    "immunology-psoriasis": {"label": "Immunology · Plaque psoriasis (biologics & orals)",
+                             "therapeutic_area": "Immunology", "indication": "plaque psoriasis",
+                             "drugs": ["secukinumab", "ustekinumab", "guselkumab", "risankizumab-rzaa", "apremilast"],
+                             "places_measure": ""},
+    "cardiometabolic-t2d": {"label": "Cardiometabolic · Type 2 diabetes (GLP-1 RAs)",
+                            "therapeutic_area": "Cardiometabolic", "indication": "type 2 diabetes mellitus",
+                            "drugs": ["semaglutide", "dulaglutide", "tirzepatide", "liraglutide"],
+                            "places_measure": "DIABETES"},
+    "cardio-anticoag": {"label": "Cardiology · Anticoagulation (DOACs)", "therapeutic_area": "Cardiology",
+                        "indication": "nonvalvular atrial fibrillation",
+                        "drugs": ["apixaban", "rivaroxaban", "dabigatran etexilate mesylate", "edoxaban tosylate"],
+                        "places_measure": "CHD"},
+    "respiratory-copd": {"label": "Respiratory · COPD (inhaled maintenance)", "therapeutic_area": "Respiratory",
+                         "indication": "chronic obstructive pulmonary disease",
+                         "drugs": ["fluticasone furoate/umeclidinium bromide/vilanterol trifenatate",
+                                   "umeclidinium bromide/vilanterol trifenatate", "tiotropium bromide"],
+                         "places_measure": "COPD"},
+}

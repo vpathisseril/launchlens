@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Choose a new password{% endblock %}
+{% block body %}
+<main id="main" class="auth-wrap">
+  <div class="card">
+    <h2>Choose a new password</h2>
+    {% if error %}<div class="alert err">{{ error }}</div><br>{% endif %}
+    <form method="post" action="/reset/{{ token }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="field"><label for="password">New password</label><input id="password" name="password" type="password" required minlength="12" autocomplete="new-password"></div>
+      <button class="btn primary"><i data-lucide="check"></i>Update password</button>
+    </form>
+  </div>
+</main>
+{% endblock %}

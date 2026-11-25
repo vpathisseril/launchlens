@@ -1,0 +1,33 @@
+{% extends "app_shell.html" %}
+{% block title %}Approvals{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="eyebrow">Admin</div><h1>Access approvals</h1><p>The SLA timer shows how long until the approval window closes for each request.</p></div></div>
+<div class="grid g3">
+  <div class="card span2">
+    <form method="post" action="/admin/approvals/decide"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="card-head"><h3><i data-lucide="inbox"></i>Queue · {{ rows|length }}</h3><div class="spacer"></div>
+        <input type="text" name="reason" placeholder="Reason (for rejections)" style="width:220px" aria-label="Rejection reason">
+        <button class="btn sm" name="action" value="reject"><i data-lucide="x"></i>Reject</button>
+        <button class="btn sm primary" name="action" value="approve"><i data-lucide="check"></i>Approve selected</button></div>
+      {% if rows %}
+      <div class="table-wrap"><table><thead><tr><th></th><th>Requested</th><th>Name</th><th>Email</th><th>Org · Title</th><th>Use case</th><th>SLA</th></tr></thead><tbody>
+      {% for r in rows %}{% set u = r.u %}
+        <tr><td><input type="checkbox" name="uid" value="{{ u.id }}" aria-label="Select {{ u.email }}"></td><td>{{ u.requested_at.strftime('%m-%d %H:%M') }}</td><td>{{ u.name }}</td><td>{{ u.email }}</td>
+          <td>{{ u.org }} · {{ u.title }}</td><td>{{ u.use_case }}</td>
+          <td>{% if r.left_h <= 4 %}<span class="pill pill-bad">{{ r.left_h }}h left</span>{% elif r.left_h <= 12 %}<span class="pill pill-warn">{{ r.left_h }}h</span>{% else %}<span class="pill">{{ r.left_h }}h</span>{% endif %}</td></tr>
+      {% endfor %}</tbody></table></div>
+      {% else %}<p class="muted">No pending requests.</p>{% endif %}
+    </form>
+  </div>
+  <div class="card">
+    <h3><i data-lucide="settings"></i>Approval mode</h3>
+    <form method="post" action="/admin/approvals/mode"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      {% for m, d in [('MANUAL','Admin approves every request'),('AUTO_AFTER_24H','Admin reviews; auto-approve when the window expires'),('AUTO_IMMEDIATE','Approve instantly on signup')] %}
+      <label class="check" style="margin-bottom:10px"><input type="radio" name="mode" value="{{ m }}" {{ 'checked' if mode == m }}><span><strong>{{ m }}</strong><br><span class="tiny muted">{{ d }}</span></span></label>
+      {% endfor %}
+      <div class="field"><label for="window">Window (hours)</label><input id="window" name="window" type="number" min="1" max="168" value="{{ window }}"></div>
+      <button class="btn primary"><i data-lucide="save"></i>Save</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

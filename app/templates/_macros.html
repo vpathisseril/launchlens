@@ -1,0 +1,51 @@
+{% macro kpi(k) -%}
+<div class="kpi">
+  <div class="kpi-label">{{ k.label }}{% if k.citation %} <span title="{{ k.citation.dataset }} · {{ k.citation.vintage }} · retrieved {{ k.citation.retrieved_at }}"><i data-lucide="info"></i></span>{% endif %}</div>
+  <div class="kpi-value">{{ k.display }}</div>
+  {% if k.delta %}<span class="delta {{ k.delta_dir }}">{% if k.delta_dir == 'up' %}▲{% elif k.delta_dir == 'down' %}▼{% endif %} {{ k.delta }}</span>{% endif %}
+  {% if k.hint %}<div class="tiny muted">{{ k.hint }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro lineage(cites) -%}
+{% if cites %}
+<details class="lineage">
+  <summary><i data-lucide="git-branch"></i>Data lineage · {{ cites|length }} source{{ 's' if cites|length != 1 }}</summary>
+  <ol>{% for c in cites %}
+    <li><strong>{{ c.dataset }}</strong> — vintage {{ c.vintage }}{% if c.locator %} · {{ c.locator }}{% endif %} · retrieved {{ c.retrieved_at }}<br><a href="{{ c.url }}" rel="noopener noreferrer" target="_blank">{{ c.url[:110] }}{% if c.url|length > 110 %}…{% endif %}</a></li>
+  {% endfor %}</ol>
+</details>
+{% endif %}
+{%- endmacro %}
+
+{% macro data_table(t) -%}
+{% if t and t.rows %}
+<div class="table-wrap"><table data-sortable>
+  <thead><tr>{% for c in t.columns %}<th scope="col" class="{{ 'num' if loop.index0 in t.numeric }}">{{ c }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for r in t.rows %}<tr>{% for v in r %}<td class="{{ 'num' if loop.index0 in t.numeric }}">{{ v }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table></div>
+{% endif %}
+{%- endmacro %}
+
+{% macro pin_form(hub_key, title, body, cites, chart, projects, csrf_token) -%}
+<details class="menu pin-menu">
+  <summary class="btn sm"><i data-lucide="pin"></i>Pin finding</summary>
+  <div class="menu-panel" style="min-width:280px;padding:12px">
+    <form hx-post="/pin" hx-target="closest .pin-menu" hx-swap="outerHTML">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="hub_key" value="{{ hub_key }}">
+      <input type="hidden" name="title" value="{{ title }}">
+      <input type="hidden" name="body" value="{{ body }}">
+      <input type="hidden" name="citations" value="{{ cites|tojson_attr }}">
+      {% if chart %}<input type="hidden" name="chart" value="{{ chart|tojson_attr }}">{% endif %}
+      <label class="tiny">Project</label>
+      <select name="project_id" aria-label="Project">
+        {% for p in projects %}<option value="{{ p.id }}">{{ p.title }}</option>{% endfor %}
+        <option value="new">+ New project…</option>
+      </select>
+      <input type="text" name="new_project" placeholder="New project name (if new)" aria-label="New project name" style="margin-top:8px">
+      <button class="btn sm primary" style="margin-top:10px;width:100%;justify-content:center"><i data-lucide="pin"></i>Pin with sources</button>
+    </form>
+  </div>
+</details>
+{%- endmacro %}

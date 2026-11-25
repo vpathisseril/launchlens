@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Request received{% endblock %}
+{% block body %}
+<main id="main" class="auth-wrap" style="max-width:560px">
+  <div class="card" style="text-align:center">
+    <div class="hub-tile" style="align-items:center"><span class="icon-wrap"><i data-lucide="hourglass"></i></span></div>
+    {% if pending_user and pending_user.status.value == 'approved' %}
+      <h2>You're approved</h2>
+      <p class="muted">Your access is active. Sign in to set up your AI access and start researching.</p>
+      <a class="btn primary lg" href="/login"><i data-lucide="log-in"></i>Sign in</a>
+    {% else %}
+      <h2>Request received</h2>
+      <p class="muted">If this email can be approved, you'll get a confirmation by email.</p>
+      {% if pending_user and due %}
+        <div class="card flat" style="margin:16px 0">
+          {% if mode == 'AUTO_AFTER_24H' %}
+            <h4>Decision by</h4><div class="kpi-value">{{ due.strftime('%b %d, %H:%M') }} UTC</div>
+            <p class="small muted">An administrator reviews requests within {{ window }} hours. If no one has acted by then, access is granted automatically.</p>
+          {% else %}
+            <h4>Status</h4><div class="kpi-value">Awaiting review</div>
+            <p class="small muted">An administrator will review your request.</p>
+          {% endif %}
+        </div>
+      {% endif %}
+      <a class="btn" href="/"><i data-lucide="arrow-left"></i>Back to home</a>
+    {% endif %}
+  </div>
+</main>
+{% endblock %}

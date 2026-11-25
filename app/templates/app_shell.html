@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="shell">
+  <aside class="sidebar" aria-label="Research hubs">
+    <a href="/app" class="{{ 'active' if request.url.path == '/app' }}"><i data-lucide="layout-dashboard"></i>Command Center</a>
+    <a href="/scope" class="{{ 'active' if request.url.path == '/scope' }}"><i data-lucide="sliders-horizontal"></i>Research scope</a>
+    <h4>Research hubs</h4>
+    {% for h in nav_hubs %}
+    <a href="/hubs/{{ h.info.key }}" class="{{ 'active' if request.url.path.startswith('/hubs/' ~ h.info.key) }}"><i data-lucide="{{ h.info.icon }}"></i>{{ h.info.short }}<span class="rank">#{{ h.info.rank }}</span></a>
+    {% endfor %}
+    <h4>Workspace</h4>
+    <a href="/projects" class="{{ 'active' if request.url.path.startswith('/projects') }}"><i data-lucide="folder-kanban"></i>Projects</a>
+    {% if 'agents' in module_keys %}<a href="/agents" class="{{ 'active' if request.url.path.startswith('/agents') }}"><i data-lucide="bot"></i>Agents</a>{% endif %}
+    <a href="/notifications"><i data-lucide="bell"></i>Alerts{% if unread %}<span class="rank">{{ unread }}</span>{% endif %}</a>
+    {% if user.role.value == 'admin' %}
+    <h4>Admin</h4>
+    <a href="/admin"><i data-lucide="gauge"></i>Overview</a>
+    <a href="/admin/approvals"><i data-lucide="user-check"></i>Approvals</a>
+    <a href="/admin/users"><i data-lucide="users"></i>Users & access</a>
+    <a href="/admin/modules"><i data-lucide="layout-grid"></i>Modules</a>
+    <a href="/admin/ai"><i data-lucide="shield-check"></i>AI governance</a>
+    <a href="/admin/usage"><i data-lucide="bar-chart-3"></i>Usage & analytics</a>
+    <a href="/admin/data"><i data-lucide="database"></i>Data sources</a>
+    <a href="/admin/audit"><i data-lucide="scroll-text"></i>Audit log</a>
+    {% endif %}
+  </aside>
+  <main id="main" class="content">{% block content %}{% endblock %}</main>
+</div>
+{% endblock %}

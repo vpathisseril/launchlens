@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Something went wrong{% endblock %}
+{% block body %}
+<main id="main" class="auth-wrap" style="max-width:560px">
+  <div class="card" style="text-align:center"><h2>Something went wrong</h2><p class="muted">{{ detail or 'Please try again.' }}</p>
+    <a class="btn primary" href="/app">Back</a></div>
+</main>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "app_shell.html" %}
+{% from "_macros.html" import kpi %}
+{% block title %}{{ hub.info.title }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="eyebrow">Hub #{{ hub.info.rank }} · {{ hub.info.short }}</div><h1>{{ hub.info.title }}</h1><p>{{ hub.info.question }}</p></div>
+  <div class="spacer"></div>
+  {% for k in kpis[:1] %}<div class="card flat" style="padding:12px 16px">{{ kpi(k) }}</div>{% endfor %}
+</div>
+<div class="scope-bar">
+  <i data-lucide="target"></i>
+  {% if scope.drugs %}{% for d in scope.drugs %}<span class="chip">{{ d }}</span>{% endfor %}{% if scope.indication %}<span class="chip"><i data-lucide="stethoscope"></i>{{ scope.indication }}</span>{% endif %}
+  {% else %}<span class="muted">No scope set.</span>{% endif %}
+  <a class="btn sm ghost" href="/scope"><i data-lucide="pencil"></i>Edit scope</a>
+  <div class="spacer"></div>
+  {% if hub.info.key == 'policy' %}
+    {% for t, lbl in [('mfn','MFN'),('tariff','Tariffs'),('pbm','PBM'),('ira','IRA')] %}
+    <form hx-post="/watch" hx-target="find button" hx-swap="innerHTML"><input type="hidden" name="kind" value="policy_topic"><input type="hidden" name="ref" value="{{ t }}">
+      <button class="btn sm">{% if t in watching %}<i data-lucide="eye-off"></i>Watching {{ lbl }}{% else %}<i data-lucide="eye"></i>Watch {{ lbl }}{% endif %}</button></form>
+    {% endfor %}
+    <form hx-post="/hubs/policy/refresh" hx-target="#refresh-msg" hx-indicator="#refresh-spin"><button class="btn sm primary"><i data-lucide="refresh-cw" id="refresh-spin" class="htmx-indicator spin"></i>Refresh policy feed</button></form><span id="refresh-msg"></span>
+  {% else %}
+    {% for d in scope.drugs[:3] %}
+    <form hx-post="/watch" hx-target="find button" hx-swap="innerHTML"><input type="hidden" name="kind" value="drug"><input type="hidden" name="ref" value="{{ d }}">
+      <button class="btn sm">{% if d in watching %}<i data-lucide="eye-off"></i>Watching {{ d }}{% else %}<i data-lucide="eye"></i>Watch {{ d }}{% endif %}</button></form>
+    {% endfor %}
+  {% endif %}
+</div>
+
+<div class="hub-layout">
+  <nav class="tabs-rail" aria-label="Views">
+    {% for vid, vtitle in hub.info.views %}
+    <a href="/hubs/{{ hub.info.key }}?view={{ vid }}" class="{{ 'active' if vid == view }}"
+       hx-get="/hubs/{{ hub.info.key }}/view/{{ vid }}" hx-target="#view" hx-push-url="/hubs/{{ hub.info.key }}?view={{ vid }}"
+       hx-indicator="#view-loading">{{ vtitle }}</a>
+    {% endfor %}
+  </nav>
+  <section aria-live="polite">
+    <div id="view-loading" class="htmx-indicator skeleton" aria-hidden="true"></div>
+    <div id="view" hx-get="/hubs/{{ hub.info.key }}/view/{{ view }}" hx-trigger="load" hx-swap="innerHTML">
+      <div class="card"><div class="skeleton"></div><p class="muted small">Loading public data… first loads can take a few seconds while sources are cached.</p></div>
+    </div>
+  </section>
+  <aside class="agent-pane card" aria-label="Research agent">
+    <div class="card-head"><h3><i data-lucide="sparkles"></i>Research agent</h3><div class="spacer"></div><span class="pill pill-pri">Citation-checked</span></div>
+    <div class="answers" id="answers" data-scroll-bottom>
+      <p class="small muted">Ask about this hub. The agent uses only the hub's public data tools and cites every number. Try:</p>
+      {% for q in {'access':['Which competitor faces the most prior authorization?','Where is access the bottleneck for this class?'],
+                   'pricing':['Which drugs in my scope are under Medicare negotiation and at what price?','Who are the likely next negotiation candidates?'],
+                   'policy':['What changed on PBM reform recently?','Which policy deadlines are coming up?'],
+                   'targeting':['Who are the top prescribers to target first?','How fast did analogs in this class ramp?'],
+                   'differentiation':['Who are the Phase 3 entrants and when do they read out?','How do competitor labels differ?']}[hub.info.key] %}
+      <button class="btn sm ghost" style="white-space:normal;text-align:left" hx-post="/hubs/{{ hub.info.key }}/ask" hx-vals='{"question": "{{ q }}"}' hx-target="#answers" hx-swap="beforeend" hx-indicator="#ask-spin"><i data-lucide="corner-down-right"></i>{{ q }}</button>
+      {% endfor %}
+    </div>
+    <form hx-post="/hubs/{{ hub.info.key }}/ask" hx-target="#answers" hx-swap="beforeend" hx-indicator="#ask-spin" data-reset>
+      <div class="field"><label for="question" class="sr-only">Question</label>
+        <textarea id="question" name="question" required maxlength="1000" placeholder="Ask a research question…" style="min-height:80px"></textarea></div>
+      <div class="row">
+        <select name="agent_id" aria-label="Agent" style="width:auto;flex:1">
+          <option value="">Default hub agent</option>
+          {% for a in agents %}<option value="{{ a.id }}">{{ a.name }}{{ ' (template)' if a.is_template }}</option>{% endfor %}
+        </select>
+        <button class="btn primary"><i data-lucide="send" ></i>Ask</button>
+        <span id="ask-spin" class="htmx-indicator"><i data-lucide="loader-circle" class="spin"></i></span>
+      </div>
+    </form>
+  </aside>
+</div>
+{% endblock %}

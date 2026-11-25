@@ -1,0 +1,49 @@
+{% extends "app_shell.html" %}
+{% block title %}Data sources{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="eyebrow">Admin</div><h1>Data sources</h1><p>Public sources, their freshness and lineage, plus curated official data you maintain.</p></div>
+  <div class="spacer"></div>
+  <form method="post" action="/admin/data/refresh-policy"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn primary"><i data-lucide="refresh-cw"></i>Refresh policy feed</button></form></div>
+{% if request.query_params.get('queued') %}<div class="alert ok">Job queued ({{ request.query_params.get('queued') }}). Refresh this page in a minute to see the status.</div><br>{% endif %}
+<div class="table-wrap" style="max-height:none"><table><thead><tr><th>Source</th><th>Publisher</th><th>Hub</th><th>Cadence</th><th>Status</th><th>Last refresh</th><th>Vintage</th></tr></thead><tbody>
+{% for s in rows %}<tr><td><a href="{{ s.url }}" target="_blank" rel="noopener noreferrer">{{ s.name }}</a><br><span class="tiny muted mono">{{ s.key }}</span></td><td>{{ s.publisher }}</td><td>{{ s.hub_key }}</td><td>{{ s.refresh_cadence }}</td>
+  <td><span class="pill {{ 'pill-ok' if s.status == 'ok' else 'pill-bad' if s.status == 'failed' else '' }}">{{ s.status }}</span>{% if s.last_error %}<br><span class="tiny muted">{{ s.last_error[:90] }}</span>{% endif %}</td>
+  <td>{{ s.last_refreshed_at.strftime('%Y-%m-%d %H:%M') if s.last_refreshed_at else '—' }}</td><td>{{ s.latest_vintage or '—' }}</td></tr>{% endfor %}
+</tbody></table></div>
+
+<div class="grid g2" style="margin-top:18px">
+  <form method="post" action="/admin/data/formulary" class="card"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <h3><i data-lucide="shield-check"></i>Load Part D formulary (R1)</h3>
+    <p class="small muted">Paste the official CMS download URL for the Quarterly Prescription Drug Plan Formulary, Pharmacy Network and Pricing Information file (ZIP). Only rows for the listed drugs are kept. Latest loaded: <strong>{{ vintages or 'none' }}</strong>.</p>
+    <div class="field"><label>CMS ZIP URL</label><input type="url" name="url" required placeholder="https://www.cms.gov/files/zip/…"></div>
+    <div class="grid g2"><div class="field"><label>Drugs (generic names)</label><input type="text" name="drugs" required placeholder="apixaban, rivaroxaban"></div>
+      <div class="field"><label>Vintage label</label><input type="text" name="vintage" required placeholder="2026-Q3"></div></div>
+    <button class="btn primary"><i data-lucide="download"></i>Queue ingest</button>
+    {% if runs %}<br><br><h4>Recent ingests</h4>{% for r in runs %}<div class="small">{{ r.source_key }} · {{ r.status }} · in {{ r.rows_in }} / out {{ r.rows_out }} · {{ r.started_at.strftime('%m-%d %H:%M') }} {{ r.error[:80] }}</div>{% endfor %}{% endif %}
+  </form>
+  <form method="post" action="/admin/data/policy-item" class="card"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <h3><i data-lucide="file-plus-2"></i>Add official policy item (R2/R3)</h3>
+    <p class="small muted">For official items that aren't in the Federal Register yet, such as an HHS or White House announcement of an MFN agreement. A .gov source is required. {{ policy_n }} items tracked.</p>
+    <div class="field"><label>Title</label><input type="text" name="title" required></div>
+    <div class="grid g3"><div class="field"><label>Topic</label><select name="topic"><option value="mfn">MFN</option><option value="tariff">Tariffs</option><option value="pbm">PBM</option><option value="ira">IRA</option><option value="other">Other</option></select></div>
+      <div class="field"><label>Status</label><select name="status"><option>Announced</option><option>Proposed</option><option>Final</option><option>In effect</option></select></div>
+      <div class="field"><label>Status date</label><input type="date" name="status_date" required></div></div>
+    <div class="field"><label>Official source URL (.gov)</label><input type="url" name="source_url" required></div>
+    <div class="field"><label>Agency</label><input type="text" name="agency"></div>
+    <div class="field"><label>Neutral summary of disclosed facts</label><textarea name="summary"></textarea></div>
+    <button class="btn primary"><i data-lucide="plus"></i>Add item</button>
+  </form>
+</div>
+
+<div class="card" id="negotiation" style="margin-top:18px">
+  <h3><i data-lucide="badge-dollar-sign"></i>Medicare negotiation data (R2) · {{ neg|length }} rows</h3>
+  <p class="small muted">Transcribed from official CMS publications. Update a row when CMS publishes new prices. The source must be on cms.gov.</p>
+  <div class="table-wrap"><table><thead><tr><th>IPAY</th><th>Drug</th><th class="num">List/30d</th><th class="num">MFP/30d</th><th class="num">Disc.</th><th>Status</th><th>Update</th></tr></thead><tbody>
+  {% for n in neg %}<tr><td>{{ n.ipay }}</td><td>{{ n.drug }}<br><span class="tiny muted">{{ n.generic }}</span></td>
+    <td class="num">{{ n.list_price_30d or '—' }}</td><td class="num">{{ n.mfp_30d or '—' }}</td><td class="num">{{ n.discount_pct or '—' }}</td><td class="small">{{ n.status }}</td>
+    <td><form method="post" action="/admin/data/negotiation/{{ n.id }}" class="row"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="text" name="mfp" placeholder="MFP" style="width:80px"><input type="text" name="list_price" placeholder="List" style="width:80px"><input type="text" name="discount" placeholder="%" style="width:60px">
+      <input type="text" name="status" placeholder="Status" style="width:140px"><input type="url" name="source_url" placeholder="cms.gov URL" style="width:160px"><button class="btn sm"><i data-lucide="save"></i></button></form></td></tr>{% endfor %}
+  </tbody></table></div>
+</div>
+{% endblock %}

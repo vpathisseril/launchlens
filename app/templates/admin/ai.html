@@ -1,0 +1,40 @@
+{% extends "app_shell.html" %}
+{% block title %}AI governance{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="eyebrow">Admin</div><h1>AI governance</h1><p>Shared default-key policy, the model registry and price table, and top spenders. Users on their own keys are never limited.</p></div></div>
+<div class="grid g3">
+{% for p in pols %}
+  <form method="post" action="/admin/ai/policy/{{ p.id }}" class="card"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="card-head"><h3><i data-lucide="cpu"></i>{{ p.provider|capitalize }}</h3><div class="spacer"></div>
+      {% if has_key[p.provider] %}<span class="pill pill-ok">Secret set</span>{% else %}<span class="pill pill-bad">No DEFAULT_{{ p.provider|upper }}_KEY</span>{% endif %}</div>
+    <div class="field"><label>Model allowlist (comma-separated)</label><input type="text" name="allowlist" value="{{ p.model_allowlist|join(', ') }}"></div>
+    <div class="grid g3">
+      <div class="field"><label>Max tokens/call</label><input type="number" name="max_tokens" value="{{ p.max_tokens_per_call }}"></div>
+      <div class="field"><label>Calls/day/user</label><input type="number" name="calls_per_day" value="{{ p.calls_per_day }}"></div>
+      <div class="field"><label>Budget $/mo</label><input type="number" step="0.01" name="budget" value="{{ p.monthly_budget_usd }}"></div>
+    </div>
+    <label class="check"><input type="checkbox" name="enabled" {{ 'checked' if p.is_enabled }}>Enabled</label><br>
+    <button class="btn sm primary"><i data-lucide="save"></i>Save policy</button>
+  </form>
+{% endfor %}
+</div>
+<div class="grid g3" style="margin-top:18px">
+  <div class="card span2">
+    <h3><i data-lucide="tags"></i>Model registry & prices</h3>
+    <p class="small muted">Tiers drive routing (economy → routing/shared key, standard → answers, premium → briefs). Enter prices from your provider's current price list so cost analytics are accurate.</p>
+    <div class="table-wrap"><table><thead><tr><th>Provider</th><th>Model</th><th>Tier</th><th class="num">$ / M in</th><th class="num">$ / M out</th><th>Updated</th></tr></thead><tbody>
+      {% for m in prices %}<tr><td>{{ m.provider }}</td><td class="mono">{{ m.model }}</td><td>{{ m.tier }}</td><td class="num">{{ m.usd_per_mtok_in }}</td><td class="num">{{ m.usd_per_mtok_out }}</td><td>{{ m.updated_at.strftime('%Y-%m-%d') }}{% if not m.usd_per_mtok_in %} <span class="pill pill-warn">set price</span>{% endif %}</td></tr>{% endfor %}
+    </tbody></table></div><br>
+    <form method="post" action="/admin/ai/price" class="grid g6"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <select name="provider" aria-label="Provider"><option>anthropic</option><option>openai</option><option>google</option></select>
+      <input type="text" name="model" placeholder="model id" required aria-label="Model id">
+      <select name="tier" aria-label="Tier"><option>economy</option><option selected>standard</option><option>premium</option></select>
+      <input type="number" step="0.0001" name="usd_in" placeholder="$/M in" aria-label="Price in">
+      <input type="number" step="0.0001" name="usd_out" placeholder="$/M out" aria-label="Price out">
+      <button class="btn sm primary"><i data-lucide="plus"></i>Add / update</button>
+    </form>
+  </div>
+  <div class="card"><h3><i data-lucide="trophy"></i>Top spenders (MTD)</h3>
+    {% for e, v in top %}<div class="row" style="justify-content:space-between"><span class="small">{{ e }}</span><span class="mono">${{ '%.4f'|format(v) }}</span></div>{% else %}<p class="muted small">No usage yet.</p>{% endfor %}</div>
+</div>
+{% endblock %}

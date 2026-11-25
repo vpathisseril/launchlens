@@ -1,0 +1,8 @@
+/* T3 — Precision Pharma (Advanced · gradient + glass) */
+[data-theme="precision-pharma"]{--bg:#F5F7FF;--surface:rgba(255,255,255,.86);--surface-2:#EEF1FF;--text:#0B1026;--muted:#5B6478;--border:#DDE3F5;
+--primary:#4338CA;--primary-ink:#FFFFFF;--accent:#0D9488;--success:#059669;--warning:#D97706;--danger:#DC2626;
+--hero:linear-gradient(135deg,#4338CA 0%,#0D9488 100%);--header:rgba(255,255,255,.8);--header-ink:#0B1026;
+--chart:#4338CA,#0D9488,#9333EA,#F59E0B,#0EA5E9,#DB2777;--seq:#EEF0FF,#4338CA;--div:#DC2626,#F8FAFC,#059669;--shadow:0 2px 6px rgba(67,56,202,.08),0 12px 32px rgba(13,148,136,.10)}
+[data-theme="precision-pharma"] .card{backdrop-filter:saturate(140%) blur(8px)}
+[data-theme="precision-pharma"] .hero h1,[data-theme="precision-pharma"] .hero p,[data-theme="precision-pharma"] .hero .eyebrow{color:#fff}
+@supports not (backdrop-filter:blur(1px)){[data-theme="precision-pharma"]{--surface:#FFFFFF}}

@@ -1,0 +1,23 @@
+{% extends "app_shell.html" %}
+{% block title %}Admin overview{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="eyebrow">Admin</div><h1>Platform overview</h1><p>Approvals, adoption, AI cost and data freshness at a glance.</p></div>
+  <div class="spacer"></div><span class="pill pill-pri">Approval mode: {{ mode }}</span></div>
+<div class="grid g6">
+  <div class="card"><div class="kpi"><div class="kpi-label"><i data-lucide="users"></i>Users</div><div class="kpi-value">{{ users|length }}</div></div></div>
+  <a class="card" href="/admin/approvals"><div class="kpi"><div class="kpi-label"><i data-lucide="user-check"></i>Pending approvals</div><div class="kpi-value">{{ pending|length }}</div>
+    {% if oldest %}<span class="delta down">oldest {{ oldest.strftime('%b %d %H:%M') }}</span>{% endif %}</div></a>
+  <div class="card"><div class="kpi"><div class="kpi-label"><i data-lucide="activity"></i>Active 7d / 30d</div><div class="kpi-value">{{ active7 }} / {{ active30 }}</div></div></div>
+  <div class="card"><div class="kpi"><div class="kpi-label"><i data-lucide="sparkles"></i>AI calls today</div><div class="kpi-value">{{ runs_today }}</div></div></div>
+  <div class="card"><div class="kpi"><div class="kpi-label"><i data-lucide="badge-dollar-sign"></i>LLM cost MTD</div><div class="kpi-value">${{ '%.2f'|format(cost_b + cost_d) }}</div>
+    <span class="tiny muted">own keys ${{ '%.2f'|format(cost_b) }} · shared ${{ '%.2f'|format(cost_d) }}</span></div></div>
+  <a class="card" href="/admin/data"><div class="kpi"><div class="kpi-label"><i data-lucide="database"></i>Data sources</div>
+    <div class="kpi-value">{{ 'OK' if not stale else stale|length ~ ' issue' ~ ('s' if stale|length > 1 else '') }}</div>
+    <span class="tiny muted">shared-key quota hits MTD: {{ quota_hits }}</span></div></a>
+</div>
+<div class="grid g2" style="margin-top:18px">
+  <div class="card"><h3><i data-lucide="filter"></i>Adoption funnel</h3><p class="small muted">Signup → approved → AI onboarded → project → pinned finding → brief.</p>
+    <div class="chart" data-chart="{{ funnel|tojson_attr }}"></div></div>
+  <div class="card"><h3><i data-lucide="trending-up"></i>AI calls · last 30 days</h3><div class="chart" data-chart="{{ trend|tojson_attr }}"></div></div>
+</div>
+{% endblock %}
