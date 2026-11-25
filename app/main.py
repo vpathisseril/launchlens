@@ -83,8 +83,11 @@ def create_app() -> FastAPI:
         return templates.TemplateResponse(request, tpl, ctx(request, None, module=module, detail=detail,
                                                             status=exc.status_code), status_code=exc.status_code)
 
-    @app.get("/healthz")
-    def healthz() -> dict[str, str]:
+    # /health is the public health check: Google Cloud Run (Replit deployments) reserves paths ending in "z",
+    # so /healthz never reaches the app in production. /healthz stays for local/dev tooling.
+    @app.get("/health")
+    @app.get("/healthz", include_in_schema=False)
+    def health() -> dict[str, str]:
         return {"status": "ok"}
 
     return app

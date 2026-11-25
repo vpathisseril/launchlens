@@ -60,7 +60,7 @@ Each prompt names exactly which files to load, which keeps token use low.
 4. `.replit` run command: `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}`.
 5. **Deploy:** an Autoscale deployment for the web app, plus **Scheduled** deployments: `python scripts/approval_sweep.py` (hourly) and
    `python -m app.data.refresh --policy --changes` (daily, 6 AM ET) for the policy feed, vintage checks, and watchlist alerts.
-6. Smoke test: `/healthz`, the signup flow, admin login, a default-key quota hit, one question per hub, and one exported brief.
+6. Smoke test: `/health`, the signup flow, admin login, a default-key quota hit, one question per hub, and one exported brief.
 7. Future releases: push to GitHub → pull in Replit (Git pane) → redeploy. Keep `main` deployable.
 
 ## W9 · Portfolio polish

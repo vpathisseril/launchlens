@@ -83,7 +83,7 @@ make check                    # ruff · bandit · pip-audit · pytest
    `python -m scripts.approval_sweep` (hourly) and `python -m scripts.daily_refresh` (daily).
 6. **First run:** sign in as admin → change password → Admin → AI governance (set model prices; confirm the shared-key
    allowlist) → Admin → Data sources → *Refresh policy feed* → load a Part D formulary ZIP (official cms.gov URL) for R1.
-7. **Smoke test:** `/healthz`, sign-up → pending, a shared-key quota hit, one question per hub, one exported brief.
+7. **Smoke test:** `/health`, sign-up → pending, a shared-key quota hit, one question per hub, one exported brief.
 8. **Releases:** push to `main` → CI green → in Replit's Git pane *Pull* → *Redeploy*.
 
 ## SDLC (how it was built)

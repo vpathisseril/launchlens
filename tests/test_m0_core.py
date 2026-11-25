@@ -112,3 +112,8 @@ def test_login_rate_limited(client):
     for _ in range(5):
         login(client, "nobody@example.com", "wrong-password")
     assert login(client, "nobody@example.com", "wrong-password").status_code == 429
+
+
+def test_health_endpoint_cloud_run_safe(client):
+    assert client.get("/health").json() == {"status": "ok"}
+    assert client.get("/healthz").json() == {"status": "ok"}
