@@ -161,9 +161,12 @@ class Pipeline:
 
 
 def _try_lock(db: Session) -> bool:
+    """Single-flight: no recorded run in progress (< 3 h old) AND, on PostgreSQL, the advisory lock is free."""
+    if runs_in_progress(db):
+        return False
     if db.get_bind().dialect.name == "postgresql":
         return bool(db.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": PG_LOCK_ID}).scalar())
-    return runs_in_progress(db) == 0
+    return True
 
 
 def _unlock(db: Session) -> None:
