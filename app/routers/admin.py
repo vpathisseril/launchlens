@@ -303,12 +303,14 @@ def data_refresh_policy(request: Request, admin: User = Depends(require_admin), 
 
 
 @router.post("/data/weekly-refresh", dependencies=[Depends(verify_csrf)])
-def data_weekly_refresh(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):  # noqa: ANN201
+def data_weekly_refresh(request: Request, mode: str = Form("due"), admin: User = Depends(require_admin),
+                        db: Session = Depends(get_db)):  # noqa: ANN201
     if weekly.runs_in_progress(db):
         return RedirectResponse("/admin/data?queued=already-running", status_code=303)
-    audit(db, admin.id, "weekly_refresh_started", "data_source", "all", ip=_ip(request))
+    mode = "full" if mode == "full" else "due"
+    audit(db, admin.id, "weekly_refresh_started", "data_source", "all", None, {"mode": mode}, _ip(request))
     db.commit()
-    _bg(weekly.run)
+    _bg(weekly.run, mode)
     return RedirectResponse("/admin/data?queued=weekly-refresh", status_code=303)
 
 

@@ -40,3 +40,9 @@ PostgreSQL (VARCHAR(40) overflow in seed labels). Fix: widen columns, apply idem
 `force_refresh()` context (each request at most once per run), refreshes the policy feed, and renders every hub view for
 the starter presets and all saved user scopes, so users hit warm caches. Sources not refreshed in 8 days show as
 Overdue in Admin → Data sources. On-demand fetches with per-source TTLs still apply between runs.
+
+**ADR-013 · Publisher-aware, sequential weekly pipeline.** `scripts/weekly_pipeline.py` runs preflight → approvals →
+policy feed → baseline → scope warm-up → housekeeping in one process. "Due" mode re-downloads only cached requests
+older than each source's cadence (7/30/90 days); new CMS data years are detected via the weekly catalog check
+(new URL). Single-flight lock (Postgres advisory lock), 20-min budget, 25-scope cap, memory released per scope,
+cache pruning, and no LLM calls (asserted via usage-event count).

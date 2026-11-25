@@ -21,19 +21,40 @@ from app.models import DataSource, SourceCache, utcnow
 from app.research.contract import Citation
 
 log = logging.getLogger("launchlens.fetch")
-_force_refresh: ContextVar[bool] = ContextVar("force_refresh", default=False)
+# Publisher-aware refresh policy for scheduled runs: re-download a cached request only when it is older than
+# this many days. A new CMS data year arrives under a NEW dataset URL (found via the weekly catalog check), so old
+# years are never re-downloaded needlessly. Unknown sources default to 7 days.
+REFRESH_DAYS: dict[str, int] = {
+    "federal_register": 7, "regulations": 7, "ctgov": 7, "openfda": 7, "cms_catalog": 7,
+    "rxnorm": 30, "pubmed": 30, "trade": 30, "partd_spending": 30, "partb_spending": 30,
+    "places": 90, "acs": 90, "partd_prescriber_drug": 90,
+}
+_refresh_mode: ContextVar[str] = ContextVar("refresh_mode", default="")  # "" | "due" | "full"
 _refreshed: ContextVar[set[str] | None] = ContextVar("refreshed", default=None)
+_stats: ContextVar[dict[str, int] | None] = ContextVar("refresh_stats", default=None)
 
 
 @contextmanager
-def force_refresh():  # noqa: ANN201
-    """Within this block every cached request is re-fetched once (used by the weekly refresh job)."""
-    t1, t2 = _force_refresh.set(True), _refreshed.set(set())
+def force_refresh(mode: str = "due"):  # noqa: ANN201
+    """Scheduled-run context. 'due': re-fetch only requests older than REFRESH_DAYS for their source;
+    'full': re-fetch everything once. Each request is fetched at most once per run. Yields hit/miss stats."""
+    stats = {"fetched": 0, "reused": 0}
+    t1, t2, t3 = _refresh_mode.set(mode), _refreshed.set(set()), _stats.set(stats)
     try:
-        yield
+        yield stats
     finally:
-        _force_refresh.reset(t1)
+        _refresh_mode.reset(t1)
         _refreshed.reset(t2)
+        _stats.reset(t3)
+
+
+def _must_refetch(source_key: str, h: str, retrieved_at, now) -> bool:  # noqa: ANN001
+    mode, done = _refresh_mode.get(), _refreshed.get()
+    if not mode or done is None or h in done:
+        return False
+    if mode == "full":
+        return True
+    return retrieved_at < now - timedelta(days=REFRESH_DAYS.get(source_key, 7))
 
 
 class SourceUnavailable(Exception):
@@ -112,12 +133,18 @@ def cached_json(db: Session, source_key: str, url: str, params: dict[str, Any] |
     h = sha256(json.dumps([source_key, url, sorted(params.items(), key=str)], default=str))
     row = db.scalar(select(SourceCache).where(SourceCache.request_hash == h))
     now = utcnow()
-    done = _refreshed.get()
-    forcing = _force_refresh.get() and done is not None and h not in done
-    if row and row.expires_at > now and not forcing:
+    done, stats = _refreshed.get(), _stats.get()
+    in_run = done is not None
+    if row and in_run and not _must_refetch(source_key, h, row.retrieved_at, now):
+        if stats is not None:
+            stats["reused"] += 1
         return row.payload, _cite(db, source_key, shown, row.retrieved_at, vintage, locator)
-    if done is not None:
+    if row and not in_run and row.expires_at > now:
+        return row.payload, _cite(db, source_key, shown, row.retrieved_at, vintage, locator)
+    if in_run:
         done.add(h)
+        if stats is not None:
+            stats["fetched"] += 1
     try:
         _pace(source_key)
         payload = http_get_json(url, params, headers)

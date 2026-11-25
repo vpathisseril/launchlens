@@ -4,17 +4,19 @@
 <div class="page-head"><div><div class="eyebrow">Admin</div><h1>Data sources</h1><p>Public sources, their freshness and lineage, plus curated official data you maintain.</p></div>
   <div class="spacer"></div>
   <form method="post" action="/admin/data/refresh-policy"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn"><i data-lucide="refresh-cw"></i>Refresh policy feed</button></form>
-  <form method="post" action="/admin/data/weekly-refresh"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn primary" {{ 'disabled' if running }}><i data-lucide="calendar-sync"></i>{{ 'Weekly refresh running…' if running else 'Run weekly refresh now' }}</button></form></div>
+  <form method="post" action="/admin/data/weekly-refresh"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn primary" name="mode" value="due" {{ 'disabled' if running }}><i data-lucide="calendar-sync"></i>{{ 'Weekly refresh running…' if running else 'Run weekly refresh now' }}</button>
+    <button class="btn" name="mode" value="full" {{ 'disabled' if running }} title="Re-download every source once, ignoring cadence"><i data-lucide="refresh-ccw"></i>Full reload</button></form></div>
 <div class="grid g4" style="margin-bottom:18px">
   <div class="card"><div class="kpi"><div class="kpi-label"><i data-lucide="calendar-clock"></i>Schedule</div><div class="kpi-value" style="font-size:1.2rem">Weekly</div>
-    <span class="tiny muted">Replit Scheduled Deployment · <span class="mono">python -m scripts.weekly_refresh</span></span></div></div>
+    <span class="tiny muted">Sundays 5:00 AM ET · <span class="mono">python -m scripts.weekly_pipeline</span> · 0 AI tokens</span></div></div>
   <div class="card"><div class="kpi"><div class="kpi-label"><i data-lucide="history"></i>Last weekly run</div>
     <div class="kpi-value" style="font-size:1.2rem">{{ weekly_run.started_at.strftime('%b %d, %H:%M') ~ ' UTC' if weekly_run else 'Never' }}</div>
     {% if weekly_run %}<span class="pill {{ 'pill-ok' if weekly_run.status == 'ok' else 'pill-warn' if weekly_run.status in ('partial','running') else 'pill-bad' }}">{{ weekly_run.status }}</span>
-    <span class="tiny muted">{{ weekly_run.rows_in }} scopes · {{ weekly_run.rows_out }} views/feeds loaded</span>{% endif %}</div></div>
+    <span class="tiny muted">{{ weekly_run.rows_in }} scopes · {{ weekly_run.rows_out }} views/feeds loaded</span>
+    {% if weekly_run.error %}<div class="tiny muted mono">{{ weekly_run.error.splitlines()[0] }}</div>{% endif %}{% endif %}</div></div>
   <div class="card"><div class="kpi"><div class="kpi-label"><i data-lucide="calendar-check"></i>Next due</div>
     <div class="kpi-value" style="font-size:1.2rem">{{ (weekly_run.started_at + timedelta(days=7)).strftime('%b %d') if weekly_run else 'Run now' }}</div>
-    <span class="tiny muted">Sources older than 8 days are flagged Overdue</span></div></div>
+    <span class="tiny muted">Overdue = older than the source's own cadence + 1 day</span></div></div>
   <div class="card"><div class="kpi"><div class="kpi-label"><i data-lucide="alarm-clock"></i>Overdue sources</div><div class="kpi-value">{{ overdue }}</div>
     <span class="tiny muted">Formulary (quarterly) and negotiation (Feb 1 / Nov 30) are loaded manually</span></div></div>
 </div>
