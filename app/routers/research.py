@@ -38,6 +38,7 @@ def render_md(text: str) -> str:
 
 
 templates.env.filters["md"] = render_md
+templates.env.globals["timedelta"] = timedelta
 templates.env.filters["tojson_attr"] = lambda v: json.dumps(v, default=str)
 
 

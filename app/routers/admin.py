@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db, session_factory
 from app.core.deps import require_admin, templates, verify_csrf
-from app.data import formulary
+from app.data import formulary, weekly
 from app.hubs.policy import refresh_policy
 from app.models import (
     AgentRun,
@@ -61,7 +61,8 @@ def overview(request: Request, admin: User = Depends(require_admin), db: Session
     cost_d = sum(e.est_cost_usd for e in ev if e.key_type == "default")
     runs_today = sum(1 for e in ev if e.at >= now.replace(hour=0, minute=0, second=0))
     sources = db.scalars(select(DataSource)).all()
-    stale = [s for s in sources if s.status in ("failed", "stale")]
+    stale = [s for s in sources if s.status in ("failed", "stale")
+             or weekly.freshness(s) == "Overdue"]
     funnel = [("Signed up", len(users)), ("Approved", sum(1 for u in users if u.status == UserStatus.approved)),
               ("Onboarded AI", sum(1 for u in users if u.ai_key_status.value != "none")),
               ("Created project", len({p.owner_id for p in db.scalars(select(ResearchProject))})),
@@ -284,8 +285,11 @@ def _bg(fn, *args) -> None:  # noqa: ANN001
 def data(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):  # noqa: ANN201
     rows = db.scalars(select(DataSource).order_by(DataSource.hub_key, DataSource.key)).all()
     runs = db.scalars(select(IngestRun).order_by(IngestRun.started_at.desc()).limit(10)).all()
+    wk = weekly.last_run(db)
     return templates.TemplateResponse(request, "admin/data.html", app_ctx(
-        request, db, admin, rows=rows, runs=runs, vintages=formulary.latest_vintage(db),
+        request, db, admin, rows=rows, runs=runs, vintages=formulary.latest_vintage(db), weekly_run=wk,
+        fresh={s.key: weekly.freshness(s) for s in rows}, overdue=weekly.overdue_count(db),
+        running=weekly.runs_in_progress(db),
         neg=db.scalars(select(NegotiationDrug).order_by(NegotiationDrug.ipay, NegotiationDrug.drug)).all(),
         policy_n=db.scalar(select(func.count()).select_from(PolicyItem)) or 0))
 
@@ -296,6 +300,16 @@ def data_refresh_policy(request: Request, admin: User = Depends(require_admin), 
     db.commit()
     _bg(refresh_policy)
     return RedirectResponse("/admin/data?queued=policy", status_code=303)
+
+
+@router.post("/data/weekly-refresh", dependencies=[Depends(verify_csrf)])
+def data_weekly_refresh(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):  # noqa: ANN201
+    if weekly.runs_in_progress(db):
+        return RedirectResponse("/admin/data?queued=already-running", status_code=303)
+    audit(db, admin.id, "weekly_refresh_started", "data_source", "all", ip=_ip(request))
+    db.commit()
+    _bg(weekly.run)
+    return RedirectResponse("/admin/data?queued=weekly-refresh", status_code=303)
 
 
 @router.post("/data/formulary", dependencies=[Depends(verify_csrf)])

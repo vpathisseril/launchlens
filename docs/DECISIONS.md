@@ -35,3 +35,8 @@ native PDF dependencies on Replit. Markdown export is also provided.
 **ADR-011 · Additive schema upgrades on start + PostgreSQL in CI.** v1.0.0 passed on SQLite but failed on Replit
 PostgreSQL (VARCHAR(40) overflow in seed labels). Fix: widen columns, apply idempotent `ALTER … TYPE VARCHAR(n)` on start
 (`app/core/schema_upgrade.py`), enforce VARCHAR limits in tests via a flush hook, and run the suite on PostgreSQL in CI.
+
+**ADR-012 · Weekly full refresh.** A scheduled job re-fetches every public source once per week inside a
+`force_refresh()` context (each request at most once per run), refreshes the policy feed, and renders every hub view for
+the starter presets and all saved user scopes, so users hit warm caches. Sources not refreshed in 8 days show as
+Overdue in Admin → Data sources. On-demand fetches with per-source TTLs still apply between runs.

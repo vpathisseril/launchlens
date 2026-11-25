@@ -57,7 +57,7 @@ flowchart LR
   D --> P[(Public APIs: CMS · FDA · NLM · CDC · Census · Federal Register)]
   A --> DB[(PostgreSQL)]
   M1 --> L[(LLM providers: Anthropic · OpenAI · Google)]
-  S[Replit Scheduled Deployments] --> J1[approval_sweep hourly] & J2[daily_refresh]
+  S[Replit Scheduled Deployments] --> J1[approval_sweep hourly] & J2[weekly_refresh Sundays]
 ```
 - **Stack:** Python 3.12, FastAPI, SQLAlchemy 2, PostgreSQL (SQLite locally), Jinja2 + HTMX, ECharts, Lucide.
 - **Module docs** (the spec the app was built from): `CLAUDE.md` + `docs/modules/*.md`. **Decisions:** `docs/DECISIONS.md`.
@@ -80,7 +80,11 @@ make check                    # ruff · bandit · pip-audit · pytest
    `python -c "from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())"`
 4. **Verify sources:** in the Replit Shell run `make sources`. Every row should be `OK`.
 5. **Deploy:** *Deploy → Autoscale* (uses `.replit`). Then add two **Scheduled** deployments:
-   `python -m scripts.approval_sweep` (hourly) and `python -m scripts.daily_refresh` (daily).
+   `python -m scripts.weekly_refresh` (**weekly**, Sundays 5:00 AM ET: re-fetches every public source, refreshes the
+   policy feed and pre-loads every hub view for the starter scopes and all saved user scopes) and
+   `python -m scripts.approval_sweep` (hourly). Admin → Data sources shows the last run, next due date, and a
+   Fresh / Overdue badge per source (Overdue = not refreshed in 8 days). The Part D formulary (quarterly) and CMS
+   negotiation data (Feb 1 / Nov 30) stay admin-loaded.
 6. **First run:** sign in as admin → change password → Admin → AI governance (set model prices; confirm the shared-key
    allowlist) → Admin → Data sources → *Refresh policy feed* → load a Part D formulary ZIP (official cms.gov URL) for R1.
 7. **Smoke test:** `/health`, sign-up → pending, a shared-key quota hit, one question per hub, one exported brief.

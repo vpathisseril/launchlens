@@ -5,6 +5,8 @@ import json
 import logging
 import time
 from collections.abc import Callable
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import timedelta
 from typing import Any
 from urllib.parse import urlencode
@@ -19,6 +21,19 @@ from app.models import DataSource, SourceCache, utcnow
 from app.research.contract import Citation
 
 log = logging.getLogger("launchlens.fetch")
+_force_refresh: ContextVar[bool] = ContextVar("force_refresh", default=False)
+_refreshed: ContextVar[set[str] | None] = ContextVar("refreshed", default=None)
+
+
+@contextmanager
+def force_refresh():  # noqa: ANN201
+    """Within this block every cached request is re-fetched once (used by the weekly refresh job)."""
+    t1, t2 = _force_refresh.set(True), _refreshed.set(set())
+    try:
+        yield
+    finally:
+        _force_refresh.reset(t1)
+        _refreshed.reset(t2)
 
 
 class SourceUnavailable(Exception):
@@ -82,8 +97,12 @@ def cached_json(db: Session, source_key: str, url: str, params: dict[str, Any] |
     h = sha256(json.dumps([source_key, url, sorted(params.items(), key=str)], default=str))
     row = db.scalar(select(SourceCache).where(SourceCache.request_hash == h))
     now = utcnow()
-    if row and row.expires_at > now:
+    done = _refreshed.get()
+    forcing = _force_refresh.get() and done is not None and h not in done
+    if row and row.expires_at > now and not forcing:
         return row.payload, _cite(db, source_key, shown, row.retrieved_at, vintage, locator)
+    if done is not None:
+        done.add(h)
     try:
         payload = http_get_json(url, params, headers)
         if reducer is not None and payload is not None:
