@@ -351,7 +351,7 @@ def edit_negotiation(request: Request, nid: int, mfp: str = Form(""), list_price
     n.mfp_30d = f(mfp) if mfp.strip() else n.mfp_30d
     n.list_price_30d = f(list_price) if list_price.strip() else n.list_price_30d
     n.discount_pct = f(discount) if discount.strip() else n.discount_pct
-    n.status = status[:40] or n.status
+    n.status = status[:120] or n.status
     if source_url:
         n.source_url, n.retrieved_at = source_url[:500], utcnow()
     audit(db, admin.id, "negotiation_edited", "negotiation", n.id, before,

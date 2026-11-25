@@ -330,10 +330,10 @@ class NegotiationDrug(Base):
     list_price_30d: Mapped[float | None] = mapped_column(Float, nullable=True)
     mfp_30d: Mapped[float | None] = mapped_column(Float, nullable=True)
     discount_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
-    status: Mapped[str] = mapped_column(String(40), default="Selected")
+    status: Mapped[str] = mapped_column(String(120), default="Selected")
     source_key: Mapped[str] = mapped_column(String(40), default="negotiation_program")
     source_url: Mapped[str] = mapped_column(String(500))
-    vintage: Mapped[str] = mapped_column(String(40))
+    vintage: Mapped[str] = mapped_column(String(120))
     retrieved_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 

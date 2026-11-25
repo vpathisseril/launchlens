@@ -18,10 +18,12 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 
 def init_db() -> None:
     import app.models  # noqa: F401 — register models
+    from app.core.schema_upgrade import upgrade
     from app.data.seed import seed
     from app.services.accounts import ensure_admin
 
     Base.metadata.create_all(get_engine())
+    upgrade(get_engine())
     with session_factory()() as db:
         seed(db)
         ensure_admin(db)

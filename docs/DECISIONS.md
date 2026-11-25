@@ -31,3 +31,7 @@ only plans plus rows for RxCUIs mapped from the scope's drugs, which keeps Repli
 
 **ADR-010 · PDF via print stylesheet.** The brief's print view produces a clean PDF from the browser and avoids heavy
 native PDF dependencies on Replit. Markdown export is also provided.
+
+**ADR-011 · Additive schema upgrades on start + PostgreSQL in CI.** v1.0.0 passed on SQLite but failed on Replit
+PostgreSQL (VARCHAR(40) overflow in seed labels). Fix: widen columns, apply idempotent `ALTER … TYPE VARCHAR(n)` on start
+(`app/core/schema_upgrade.py`), enforce VARCHAR limits in tests via a flush hook, and run the suite on PostgreSQL in CI.

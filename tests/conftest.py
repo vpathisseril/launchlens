@@ -16,9 +16,25 @@ import httpx
 import pytest
 import respx
 from fastapi.testclient import TestClient
+from sqlalchemy import String, event
+from sqlalchemy.orm import Session
 
 from app.core import db as dbmod
 from app.core.security import limiter
+
+
+@event.listens_for(Session, "before_flush")
+def _enforce_varchar_lengths(session, _ctx, _instances):  # noqa: ANN001
+    """SQLite ignores VARCHAR(n); PostgreSQL rejects overflow. Fail tests the way production would."""
+    for obj in list(session.new) + list(session.dirty):
+        table = getattr(obj, "__table__", None)
+        if table is None:
+            continue
+        for col in table.columns:
+            if isinstance(col.type, String) and col.type.length:
+                val = getattr(obj, col.key, None)
+                if isinstance(val, str) and len(val) > col.type.length:
+                    raise AssertionError(f"{table.name}.{col.name}: {len(val)} chars > VARCHAR({col.type.length}): {val[:60]!r}")
 
 CMS_PRESC = "https://data.cms.gov/data-api/v1/dataset/presc-2023/data"
 CMS_PRESC_PREV = "https://data.cms.gov/data-api/v1/dataset/presc-2022/data"
@@ -195,7 +211,13 @@ def api_mock():
 
 @pytest.fixture()
 def client(tmp_path, api_mock):
-    dbmod.reset_engine(f"sqlite:///{tmp_path / 'test.db'}")
+    pg = os.environ.get("TEST_DATABASE_URL")
+    if pg:  # CI PostgreSQL job: fresh schema per test
+        import app.models  # noqa: F401
+        dbmod.reset_engine(pg)
+        dbmod.Base.metadata.drop_all(dbmod.get_engine())
+    else:
+        dbmod.reset_engine(f"sqlite:///{tmp_path / 'test.db'}")
     limiter.reset()
     from app.hubs import targeting
     targeting._cache.clear()
