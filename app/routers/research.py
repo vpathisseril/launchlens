@@ -25,7 +25,7 @@ from app.research import agent as research_agent
 from app.research import briefs
 from app.research.contract import norm_scope
 from app.research.scopes import PRESETS
-from app.services.ai_access import NoAiAccess, QuotaExceeded
+from app.services.ai_access import NeedsModelChoice, NoAiAccess, QuotaExceeded
 
 router = APIRouter()
 
@@ -171,6 +171,9 @@ def hub_ask(request: Request, key: str, question: str = Form(...), agent_id: str
     try:
         ans = research_agent.ask(db, user, q, norm_scope(user.scope), sorted(user_module_keys(db, user) - {"agents"}),
                                  primary_hub=key, agent=agent)
+    except NeedsModelChoice as exc:
+        return templates.TemplateResponse(request, "app/_answer.html", ctx(
+            request, user, error=str(exc), quota=True, fix_url="/account/ai#routing", fix_label="Choose a model"))
     except QuotaExceeded as exc:
         return templates.TemplateResponse(request, "app/_answer.html", ctx(request, user, error=str(exc), quota=True))
     except NoAiAccess as exc:

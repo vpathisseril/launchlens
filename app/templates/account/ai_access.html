@@ -24,22 +24,34 @@
   {% endfor %}
 </div>
 <br>
-<div class="card">
+<div class="card" id="routing">
   <h3><i data-lucide="route"></i>Model routing</h3>
-  <p class="small muted">Choose which model handles each task with your own key: <strong>answer</strong> for hub agents and <strong>brief</strong> for executive briefs. Leave a field blank to use the registry default for its tier.</p>
+  <p class="small muted">Choose which model handles each task with your own key: <strong>answer</strong> for hub agents and <strong>brief</strong> for executive briefs. Leave a field on <strong>Auto</strong> and LaunchLens picks a current model from your provider's own list (shown below). You only need to choose if you want a specific model.</p>
+  {% set eff_pref = effective.get(user.preferred_provider, {}) %}
+  {% if keys and user.preferred_provider in keys %}
+    {% if eff_pref.get('answer') %}<div class="alert ok"><i data-lucide="circle-check"></i><div>Ready: research questions use <strong class="mono">{{ eff_pref.answer }}</strong> and briefs use <strong class="mono">{{ eff_pref.brief }}</strong> ({{ labels[user.preferred_provider] }}).</div></div><br>
+    {% else %}<div class="alert warn"><i data-lucide="triangle-alert"></i><div>No model could be chosen automatically for {{ labels[user.preferred_provider] }}. Pick one below.</div></div><br>{% endif %}
+  {% endif %}
   <form method="post" action="/account/ai/models">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="field" style="max-width:320px"><label for="pp">Preferred provider</label>
       <select id="pp" name="preferred_provider">{% for p in providers %}<option value="{{ p }}" {{ 'selected' if user.preferred_provider == p }}>{{ labels[p] }}</option>{% endfor %}</select></div>
     <div class="table-wrap"><table><thead><tr><th>Provider</th><th>Answer model</th><th>Brief model</th></tr></thead><tbody>
-    {% for p in providers %}{% set prefs = (user.preferred_models or {}).get(p, {}) %}{% set avail = (user.preferred_models or {}).get('available_' ~ p, []) + models.get(p, []) %}
-      <tr><td>{{ labels[p] }}</td>
-        <td><input list="ml-{{ p }}" name="{{ p }}_answer" value="{{ prefs.get('answer','') }}" placeholder="default" type="text"></td>
-        <td><input list="ml-{{ p }}" name="{{ p }}_brief" value="{{ prefs.get('brief','') }}" placeholder="default" type="text">
-          <datalist id="ml-{{ p }}">{% for m in avail|unique %}<option value="{{ m }}">{% endfor %}</datalist></td></tr>
+    {% for p in providers %}{% set prefs = (user.preferred_models or {}).get(p, {}) %}{% set avail = ((user.preferred_models or {}).get('available_' ~ p, []) + models.get(p, []))|unique|list %}{% set eff = effective.get(p, {}) %}
+      <tr><td>{{ labels[p] }}{% if p not in keys %}<br><span class="tiny muted">no key</span>{% endif %}</td>
+        {% for task in ('answer', 'brief') %}
+        <td><select name="{{ p }}_{{ task }}" aria-label="{{ labels[p] }} {{ task }} model" {{ 'disabled' if p not in keys }}>
+          <option value="">Auto{{ ' · ' ~ eff.get(task) if eff.get(task) }}</option>
+          {% for m in avail|sort %}<option value="{{ m }}" {{ 'selected' if prefs.get(task) == m }}>{{ m }}</option>{% endfor %}
+        </select></td>
+        {% endfor %}</tr>
     {% endfor %}</tbody></table></div><br>
-    <button class="btn primary"><i data-lucide="save"></i>Save routing</button>
+    <div class="row"><button class="btn primary"><i data-lucide="save"></i>Save routing</button></div>
   </form>
+  <form method="post" action="/account/ai/refresh-models" style="margin-top:10px"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="btn sm"><i data-lucide="refresh-cw"></i>Refresh model lists from providers</button>
+    <span class="tiny muted">Free call; use it when a provider releases new models.</span></form>
+  {% if request.query_params.get('refresh_failed') %}<div class="alert err" style="margin-top:8px">Couldn't refresh: {{ request.query_params.get('refresh_failed') }}. The key may have been revoked.</div>{% endif %}
 </div>
 {% if user.ai_key_status.value == 'default_accepted' %}
 <br><div class="card"><h3><i data-lucide="gauge"></i>Shared key usage today</h3>

@@ -26,7 +26,8 @@ def _ai_ctx(db: Session, user: User) -> dict:
     avail = [p.provider for p in ai_access.default_providers_available(db)]
     models = {p: [m.model for m in db.scalars(select(ModelPrice).where(ModelPrice.provider == p))] for p in PROVIDERS}
     return {"keys": keys, "policies": pols, "default_available": avail, "providers": PROVIDERS,
-            "labels": PROVIDER_LABELS, "calls_today": ai_access.calls_today(db, user), "models": models}
+            "labels": PROVIDER_LABELS, "calls_today": ai_access.calls_today(db, user), "models": models,
+            "effective": ai_access.effective_models(db, user)}
 
 
 @router.get("/onboarding/ai-keys", response_class=HTMLResponse)
@@ -74,9 +75,13 @@ async def save_models(request: Request, user: User = Depends(require_login), db:
     for p in PROVIDERS:
         cur = dict(prefs.get(p, {}))
         for task in ai_access.TASKS:
+            if f"{p}_{task}" not in form:
+                continue
             v = str(form.get(f"{p}_{task}", "")).strip()[:80]
             if v:
                 cur[task] = v
+            else:
+                cur.pop(task, None)  # back to Auto
         prefs[p] = cur
     prov = str(form.get("preferred_provider", user.preferred_provider))
     if prov in PROVIDERS:
@@ -84,6 +89,14 @@ async def save_models(request: Request, user: User = Depends(require_login), db:
     user.preferred_models = prefs
     db.commit()
     return RedirectResponse("/account/ai?saved=1", status_code=303)
+
+
+@router.post("/account/ai/refresh-models", dependencies=[Depends(verify_csrf)])
+def refresh_models(user: User = Depends(require_login), db: Session = Depends(get_db)):  # noqa: ANN201
+    res = ai_access.refresh_model_lists(db, user)
+    bad = [p for p, n in res.items() if n < 0]
+    return RedirectResponse("/account/ai?" + ("refresh_failed=" + ",".join(bad) if bad else "saved=1") + "#routing",
+                            status_code=303)
 
 
 @router.post("/account/ai/delete", dependencies=[Depends(verify_csrf)])

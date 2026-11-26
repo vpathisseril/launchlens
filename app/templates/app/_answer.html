@@ -1,7 +1,7 @@
 {% from "_macros.html" import lineage, pin_form %}
 {% if error %}
 <div class="answer"><div class="alert {{ 'warn' if quota else 'err' }}"><i data-lucide="{{ 'gauge' if quota else 'alert-circle' }}"></i>
-  <div>{{ error }}{% if quota %}<br><a class="btn sm primary" href="/account/ai" style="margin-top:8px"><i data-lucide="key-round"></i>Add your own key</a>{% endif %}</div></div></div>
+  <div>{{ error }}{% if quota %}<br><a class="btn sm primary" href="{{ fix_url or '/account/ai' }}" style="margin-top:8px"><i data-lucide="{{ 'route' if fix_url else 'key-round' }}"></i>{{ fix_label or ('Add your own key' if user.ai_key_status.value != 'byok_valid' else 'Open AI access') }}</a>{% endif %}</div></div></div>
 {% else %}
 <div class="answer">
   <div class="q"><i data-lucide="message-circle-question"></i> {{ question }}</div>

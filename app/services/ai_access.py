@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from dataclasses import dataclass
 from datetime import timedelta
@@ -73,11 +74,35 @@ def save_byok(db: Session, user: User, provider: str, raw_key: str, label: str =
     user.preferred_provider = provider
     prefs = dict(user.preferred_models or {})
     prefs.setdefault(provider, {})
-    prefs["available_" + provider] = [m for m in models if _chat_capable(provider, m)][:60]
+    prefs["available_" + provider] = rank_models(provider, models)
     user.preferred_models = prefs
     audit(db, user.id, "byok_saved", "user_api_key", provider, after={"last4": row.key_last4})
     db.commit()
     return models
+
+
+def rank_models(provider: str, models: list[str], cap: int = 80) -> list[str]:
+    """Chat-capable models, stable names first, newest version first (so a cap never drops current models)."""
+    chat = [m for m in models if _chat_capable(provider, m)]
+    return sorted(chat, key=lambda m: (bool(_SKIP.search(m)), tuple(-x for x in _version(m)), m))[:cap]
+
+
+def refresh_model_lists(db: Session, user: User) -> dict[str, int]:
+    """Re-list models for each valid key (free API call) and store the ranked list."""
+    out: dict[str, int] = {}
+    prefs = dict(user.preferred_models or {})
+    for k in db.scalars(select(UserApiKey).where(UserApiKey.user_id == user.id, UserApiKey.is_valid.is_(True))):
+        key = decrypt_secret(k.key_ciphertext)
+        if not key:
+            continue
+        try:
+            prefs["available_" + k.provider] = rank_models(k.provider, providers.list_models(k.provider, key))
+            out[k.provider] = len(prefs["available_" + k.provider])
+        except providers.ProviderError:
+            out[k.provider] = -1
+    user.preferred_models = prefs
+    db.commit()
+    return out
 
 
 def _chat_capable(provider: str, model: str) -> bool:
@@ -129,25 +154,89 @@ def tier_model(db: Session, provider: str, tier: str, allow: list[str] | None = 
     return None
 
 
+class NeedsModelChoice(NoAiAccess):
+    """User has valid keys but no model could be determined — send them to model routing, not to 'add a key'."""
+
+
 def resolve_access(db: Session, user: User, task: str = "answer", requested_model: str | None = None,
                    requested_provider: str | None = None, max_tokens: int = 900) -> ResolvedAccess:
-    """Picks key + model for a call. BYOK: unlimited, user's choice. Default: allowlist, token cap, daily cap."""
-    provider = requested_provider or user.preferred_provider or "anthropic"
-    byok = db.scalar(select(UserApiKey).where(UserApiKey.user_id == user.id, UserApiKey.provider == provider,
-                                              UserApiKey.is_valid.is_(True)))
-    if byok is None and requested_provider is None:
-        byok = db.scalar(select(UserApiKey).where(UserApiKey.user_id == user.id, UserApiKey.is_valid.is_(True)))
-        if byok:
-            provider = byok.provider
-    if byok:
-        key = decrypt_secret(byok.key_ciphertext)
-        if key:
-            prefs = (user.preferred_models or {}).get(provider, {})
-            model = requested_model or prefs.get(task) or prefs.get("answer") or _fallback_model(db, provider, task)
-            if not model:
-                raise NoAiAccess("Choose a model for this provider in Settings → AI Access.")
-            return ResolvedAccess(provider, model, key, "byok", max_tokens)
+    """Picks key + model for a call.
 
+    BYOK (unlimited): try the requested provider, then the user's preferred provider, then any other provider with a
+    valid key. For each, the model is: requested → the user's choice for this task → the registry default for the
+    task's tier → the best match from the models the provider listed when the key was validated. The user is asked
+    to act only when nothing usable is configured.
+    Shared default key: allowlist, token cap, daily cap and monthly budget.
+    """
+    keys = {k.provider: k for k in db.scalars(select(UserApiKey).where(UserApiKey.user_id == user.id,
+                                                                       UserApiKey.is_valid.is_(True)))}
+    order = [p for p in (requested_provider, user.preferred_provider, *sorted(keys)) if p]
+    tried: list[str] = []
+    for provider in dict.fromkeys(order):
+        row = keys.get(provider)
+        if row is None:
+            continue
+        key = decrypt_secret(row.key_ciphertext)
+        if not key:
+            continue
+        own_model = requested_model if provider == (requested_provider or provider) else None
+        model = own_model or model_for(db, user, provider, task)
+        if model:
+            notice = "" if provider == (requested_provider or user.preferred_provider) else \
+                f"Using your {provider} key (no model available for your preferred provider)."
+            return ResolvedAccess(provider, model, key, "byok", max_tokens, notice)
+        tried.append(provider)
+    if tried:
+        raise NeedsModelChoice(f"Your {', '.join(tried)} key is valid, but no model is selected. Pick one under "
+                               "Settings → AI access → Model routing.")
+    return _resolve_default(db, user, requested_model, requested_provider, max_tokens)
+
+
+def model_for(db: Session, user: User, provider: str, task: str) -> str | None:
+    prefs = (user.preferred_models or {}).get(provider, {}) or {}
+    chosen = prefs.get(task) or (prefs.get("answer") if task == "route" else None)
+    return chosen or _fallback_model(db, provider, task) or \
+        pick_from_available((user.preferred_models or {}).get("available_" + provider) or [], task) or \
+        prefs.get("answer")
+
+
+_SKIP = re.compile(r"(\d{4}-\d{2}-\d{2}|-\d{4}$|\d{8}|preview|exp|audio|realtime|search|tts|transcri|embed|image|vision"
+                   r"|instruct|codex|oss|moderation|learnlm|gemma|aqa|live|thinking|computer)", re.I)
+_LIGHT = ("mini", "flash", "haiku")
+_TINY = ("nano", "lite", "8b")
+
+
+def _version(m: str) -> tuple[float, ...]:
+    return tuple(float(x) for x in re.findall(r"\d+(?:\.\d+)?", m)) or (0.0,)
+
+
+def pick_from_available(models: list[str], task: str) -> str | None:
+    """Choose a sensible current model from the provider's own list (newest stable; light tier for answers,
+    flagship for briefs). Dated snapshots, previews and non-chat models are skipped."""
+    cands = [m for m in models if not _SKIP.search(m)] or list(models)
+    if not cands:
+        return None
+    def parts(m: str) -> set[str]:  # whole name segments, so "gemini" is not mistaken for "mini"
+        return set(re.split(r"[-_.:/ ]", m.lower()))
+
+    light = [m for m in cands if parts(m) & set(_LIGHT) and not parts(m) & set(_TINY)]
+    heavy = [m for m in cands if not parts(m) & set(_LIGHT + _TINY)]
+    pool = (light or heavy) if task in ("route", "answer") else (heavy or light)
+    pool = pool or cands
+    return max(pool, key=lambda m: (_version(m), -len(m)))
+
+
+def effective_models(db: Session, user: User) -> dict[str, dict[str, str]]:
+    """What each task will use per provider with the user's keys (shown in Settings)."""
+    out: dict[str, dict[str, str]] = {}
+    for k in db.scalars(select(UserApiKey).where(UserApiKey.user_id == user.id, UserApiKey.is_valid.is_(True))):
+        out[k.provider] = {t: (model_for(db, user, k.provider, t) or "") for t in ("answer", "brief")}
+    return out
+
+
+def _resolve_default(db: Session, user: User, requested_model: str | None, requested_provider: str | None,
+                     max_tokens: int) -> ResolvedAccess:
+    provider = requested_provider or user.preferred_provider or "anthropic"
     if user.ai_key_status != AiKeyStatus.default_accepted:
         raise NoAiAccess("Add your own API key or accept the shared default key in Settings → AI Access.")
     pols = default_providers_available(db)
