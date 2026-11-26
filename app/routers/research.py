@@ -25,6 +25,7 @@ from app.research import agent as research_agent
 from app.research import briefs
 from app.research.contract import norm_scope
 from app.research.scopes import PRESETS
+from app.services import ai_errors
 from app.services.ai_access import NeedsModelChoice, NoAiAccess, QuotaExceeded
 
 router = APIRouter()
@@ -40,6 +41,22 @@ def render_md(text: str) -> str:
 templates.env.filters["md"] = render_md
 templates.env.globals["timedelta"] = timedelta
 templates.env.filters["tojson_attr"] = lambda v: json.dumps(v, default=str)
+
+
+def friendly(exc: Exception) -> ai_errors.FriendlyError:
+    if isinstance(exc, QuotaExceeded):
+        return ai_errors.for_quota(str(exc))
+    if isinstance(exc, NeedsModelChoice):
+        return ai_errors.for_model_choice(str(exc))
+    if isinstance(exc, NoAiAccess):
+        return ai_errors.for_no_access(str(exc))
+    if isinstance(exc, ProviderError):
+        return ai_errors.for_provider(exc, getattr(exc, "provider", ""), getattr(exc, "key_type", ""),
+                                      getattr(exc, "model", ""))
+    return ai_errors.FriendlyError("The AI request failed", "Please try again.", "Open AI access", "/account/ai", "err")
+
+
+AI_ERRORS = (QuotaExceeded, NoAiAccess, ProviderError)
 
 
 def _hubs_for(db: Session, user: User) -> list:
@@ -160,8 +177,8 @@ def hub_ask(request: Request, key: str, question: str = Form(...), agent_id: str
             user: User = Depends(require_user), db: Session = Depends(get_db)):  # noqa: ANN201
     _hub_or_404(db, user, key)
     if not limiter.allow(f"ask:{user.id}", 20, 60):
-        return templates.TemplateResponse(request, "app/_answer.html", ctx(request, user, error="Slow down a little — "
-                                                                           "max 20 questions per minute."))
+        return templates.TemplateResponse(request, "app/_answer.html", ctx(request, user, fe=ai_errors.FriendlyError(
+            "Slow down a little", "You can ask up to 20 questions per minute. Try again in a moment.", "", "")))
     agent = None
     if agent_id.isdigit():
         agent = db.get(Agent, int(agent_id))
@@ -171,15 +188,9 @@ def hub_ask(request: Request, key: str, question: str = Form(...), agent_id: str
     try:
         ans = research_agent.ask(db, user, q, norm_scope(user.scope), sorted(user_module_keys(db, user) - {"agents"}),
                                  primary_hub=key, agent=agent)
-    except NeedsModelChoice as exc:
-        return templates.TemplateResponse(request, "app/_answer.html", ctx(
-            request, user, error=str(exc), quota=True, fix_url="/account/ai#routing", fix_label="Choose a model"))
-    except QuotaExceeded as exc:
-        return templates.TemplateResponse(request, "app/_answer.html", ctx(request, user, error=str(exc), quota=True))
-    except NoAiAccess as exc:
-        return templates.TemplateResponse(request, "app/_answer.html", ctx(request, user, error=str(exc), quota=True))
-    except ProviderError as exc:
-        return templates.TemplateResponse(request, "app/_answer.html", ctx(request, user, error=str(exc)))
+    except AI_ERRORS as exc:
+        return templates.TemplateResponse(request, "app/_answer.html", ctx(request, user, fe=friendly(exc),
+                                                                           question=q))
     projects = db.scalars(select(ResearchProject).where(ResearchProject.owner_id == user.id,
                                                         ResearchProject.status == "active")).all()
     return templates.TemplateResponse(request, "app/_answer.html", ctx(request, user, ans=ans, question=q, hub_key=key,
@@ -274,8 +285,9 @@ def project_detail(request: Request, pid: int, user: User = Depends(require_user
     for f in p.findings:
         by_hub.setdefault(f.hub_key, []).append(f)
     bs = db.scalars(select(Brief).where(Brief.project_id == p.id).order_by(Brief.version.desc())).all()
+    fe = request.session.pop("ai_error", None)
     return templates.TemplateResponse(request, "app/project.html", app_ctx(request, db, user, p=p, by_hub=by_hub,
-                                                                           briefs=bs, hubs=HUBS))
+                                                                           briefs=bs, hubs=HUBS, fe=fe))
 
 
 @router.post("/projects/{pid}/notes", dependencies=[Depends(verify_csrf)])
@@ -333,8 +345,9 @@ def brief_generate(request: Request, pid: int, mode: str = Form("ai"), user: Use
         return RedirectResponse(f"/projects/{pid}#briefs", status_code=303)
     try:
         briefs.generate(db, user, p)
-    except (QuotaExceeded, NoAiAccess, ProviderError) as exc:
-        return RedirectResponse(f"/projects/{pid}?err={type(exc).__name__}", status_code=303)
+    except AI_ERRORS as exc:
+        request.session["ai_error"] = friendly(exc).__dict__
+        return RedirectResponse(f"/projects/{pid}?err=ai", status_code=303)
     return RedirectResponse(f"/projects/{pid}#briefs", status_code=303)
 
 

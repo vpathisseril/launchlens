@@ -6,15 +6,14 @@
   <div class="inner">
     <div>
       <div class="eyebrow">Launch intelligence · Life sciences</div>
-      <h1>Research the five forces that decide a drug launch.</h1>
-      <p>Most launches miss expectations, and limited market access is the most-cited reason. LaunchLens brings public
-        CMS, FDA, NIH, CDC, Census and Federal Register data together with citation-checked AI research agents, so your
-        team can see access, pricing policy, policy risk, targeting and competition in one place.</p>
+      <h1>{{ about.tagline }}</h1>
+      <p>{{ about.summary }}</p>
       <div class="row" style="margin-top:22px">
         <a class="btn primary lg" href="/signup"><i data-lucide="sparkles"></i>Request access</a>
         <a class="btn lg" href="/login">Sign in</a>
+        <a class="btn ghost lg" href="/about"><i data-lucide="info"></i>About</a>
       </div>
-      <p class="small" style="margin-top:14px">Access is reviewed within 24 hours. Bring your own AI key for unlimited research.</p>
+      <p class="small" style="margin-top:14px">{{ about.approval }} Bring your own AI key for unlimited research.</p>
     </div>
     <img src="/static/img/hero.svg" alt="" width="560" height="420">
   </div>
@@ -24,7 +23,7 @@
   <h2>Five research hubs, ranked by 2026 demand</h2>
   <p class="lead">Each hub answers one executive question with public data, transparent methods and a data-lineage trail on every number.</p>
   <div class="grid g5">
-    {% for h in hubs %}
+    {% for h in about.hubs %}
     <div class="card hub-tile">
       <span class="rank-chip">#{{ h.info.rank }}</span>
       <span class="icon-wrap"><i data-lucide="{{ h.info.icon }}"></i></span>
@@ -38,27 +37,19 @@
 
 <section class="section" style="padding-top:0">
   <h2>One research loop everywhere</h2>
-  <p class="lead">Ask a question, explore curated public data, analyze it, let a guardrailed agent synthesize it with citations, pin the evidence, and export a board-ready brief.</p>
   <div class="loop">
-    {% for s, i in [("Ask","message-circle-question"),("Explore","database"),("Analyze","chart-no-axes-combined"),("Synthesize","sparkles"),("Pin","pin"),("Brief","file-text")] %}
-    <span class="step"><i data-lucide="{{ i }}"></i>{{ s }}</span>{% if not loop.last %}<span class="arrow"><i data-lucide="chevron-right"></i></span>{% endif %}
-    {% endfor %}
+    {% for s, i in about.loop %}<span class="step"><i data-lucide="{{ i }}"></i>{{ s }}</span>{% if not loop.last %}<span class="arrow"><i data-lucide="chevron-right"></i></span>{% endif %}{% endfor %}
   </div>
 </section>
 
 <section class="section" style="padding-top:0">
-  <div class="grid g3">
-    <div class="card"><h3><i data-lucide="badge-check"></i>No made-up numbers</h3><p class="muted">Every answer goes through a citation checker. Each number must appear in the source data and carry a [n] reference, or the answer is flagged.</p></div>
-    <div class="card"><h3><i data-lucide="lock-keyhole"></i>Your keys, your control</h3><p class="muted">Bring your own Anthropic, OpenAI or Gemini key (encrypted at rest, never shown again) for unlimited use, or try the limited shared key.</p></div>
-    <div class="card"><h3><i data-lucide="scale"></i>Neutral on policy</h3><p class="muted">Policy items show official status and dates from the Federal Register and agency sources. Proposals are never presented as law.</p></div>
-  </div>
+  <div class="grid g4">{% for icon, t, d in about.principles %}
+    <div class="card"><h3><i data-lucide="{{ icon }}"></i>{{ t }}</h3><p class="muted small">{{ d }}</p></div>{% endfor %}</div>
 </section>
 
 <section class="section" style="padding-top:0">
-  <h4 style="text-align:center">Public sources</h4>
-  <div class="logos">
-    {% for s in ["CMS Part D Prescribers","CMS Part D & B Spending","CMS Part D Formulary","CMS Drug Price Negotiation","openFDA","ClinicalTrials.gov","RxNorm","CDC PLACES","Census ACS","Census Trade","Federal Register","Regulations.gov","PubMed"] %}<span>{{ s }}</span>{% endfor %}
-  </div>
+  <h4 style="text-align:center">Public sources · <a href="/about#data">details</a></h4>
+  <div class="logos">{% for s in about.sources %}<span>{{ s.name }}</span>{% endfor %}</div>
 </section>
 </main>
 {% endblock %}

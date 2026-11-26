@@ -28,7 +28,7 @@ def test_m1_invalid_key_not_stored(client):
     tok = csrf(client, "/onboarding/ai-keys")
     r = client.post("/onboarding/ai-keys/byok", data={"csrf_token": tok, "provider": "anthropic",
                                                       "api_key": "sk-ant-bad-key-0000", "back": "/app"})
-    assert r.status_code == 400 and "could not be validated" in r.text
+    assert r.status_code == 400 and "rejected this key" in r.text and "sk-ant-api03-" in r.text
     with dbmod.session_factory()() as s:
         assert s.scalar(select(UserApiKey)) is None
 

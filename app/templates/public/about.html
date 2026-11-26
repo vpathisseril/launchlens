@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}About{% endblock %}
+{% block body %}
+<main id="main" class="section" style="max-width:1100px">
+  <div class="page-head"><div><div class="eyebrow">About {{ about.name }} · v{{ about.version }}</div>
+    <h1>{{ about.tagline }}</h1><p>{{ about.summary }}</p></div></div>
+
+  <nav class="row" aria-label="About sections" style="margin-bottom:18px">
+    {% for a, t in [('hubs','Research hubs'),('how','How it works'),('ai','AI & your keys'),('data','Data sources'),('limits','Limitations'),('access','Access')] %}
+    <a class="chip" href="#{{ a }}">{{ t }}</a>{% endfor %}
+  </nav>
+
+  <h2 id="hubs">Five research hubs</h2>
+  <div class="grid g5">{% for h in about.hubs %}
+    <div class="card hub-tile"><span class="rank-chip">#{{ h.info.rank }}</span><span class="icon-wrap"><i data-lucide="{{ h.info.icon }}"></i></span>
+      <h3>{{ h.info.short }}</h3><div class="q">{{ h.info.question }}</div>
+      <div class="tiny muted">{{ h.info.views|map(attribute=1)|join(' · ') }}</div></div>{% endfor %}</div>
+
+  <h2 id="how" style="margin-top:36px">How it works</h2>
+  <div class="loop" style="justify-content:flex-start">{% for s, i in about.loop %}<span class="step"><i data-lucide="{{ i }}"></i>{{ s }}</span>{% if not loop.last %}<span class="arrow"><i data-lucide="chevron-right"></i></span>{% endif %}{% endfor %}</div>
+  <div class="grid g4" style="margin-top:16px">{% for icon, t, d in about.principles %}
+    <div class="card"><h3><i data-lucide="{{ icon }}"></i>{{ t }}</h3><p class="small muted">{{ d }}</p></div>{% endfor %}</div>
+
+  <h2 id="ai" style="margin-top:36px">AI & your keys</h2>
+  <div class="grid g2">
+    <div class="card"><h3><i data-lucide="key-round"></i>Your own key — no LaunchLens limits</h3>
+      <p class="small">Supported providers: {{ about.ai.providers|join(', ') }}. Paste a key in <strong>Settings → AI access</strong>; it's validated with a free model-list call, encrypted, and only its last 4 characters are ever shown. Provider-side rate limits and billing still apply.</p>
+      <h4>Research profiles</h4>
+      <ul class="small">{% for k, p in about.ai.profiles.items() %}<li><strong>{{ p.label }}</strong>{{ ' (default)' if k == about.ai.default_profile }} — {{ p.help }}</li>{% endfor %}</ul></div>
+    <div class="card"><h3><i data-lucide="gauge"></i>Shared default key — limited</h3>
+      {% if about.ai.shared %}{% for s in about.ai.shared %}
+      <ul class="small"><li>{{ s.provider }}: {{ s.models }}</li><li>Up to {{ s.max_tokens }} output tokens per call</li><li>{{ s.calls_per_day }} research calls per user per day, plus a monthly budget</li></ul>{% endfor %}
+      <p class="small muted">Only the shared key has limits. When you hit one, add your own key in Settings → AI access to remove it.</p>
+      {% else %}<p class="small muted">The shared key isn't enabled on this deployment — add your own key to use the research agents.</p>{% endif %}</div>
+  </div>
+
+  <h2 id="data" style="margin-top:36px">Data sources</h2>
+  <p class="small muted">Refreshed by a weekly pipeline that downloads only what each publisher has updated; every chart links to its exact dataset, vintage and retrieval time.</p>
+  <div class="table-wrap" style="max-height:none"><table><thead><tr><th>Source</th><th>Publisher</th><th>Hub</th><th>Publisher updates</th><th>LaunchLens refresh</th><th>Status</th></tr></thead><tbody>
+  {% for s in about.sources %}<tr><td><a href="{{ s.url }}" target="_blank" rel="noopener noreferrer">{{ s.name }}</a></td><td>{{ s.publisher }}</td><td>{{ s.hub }}</td><td>{{ s.publisher_cadence }}</td><td>{{ s.refresh }}</td>
+    <td><span class="pill {{ 'pill-ok' if s.freshness == 'Fresh' else 'pill-pri' if s.freshness == 'Manual' else '' }}">{{ s.freshness }}</span></td></tr>{% endfor %}
+  </tbody></table></div>
+
+  <h2 id="limits" style="margin-top:36px">Limitations</h2>
+  <ul>{% for l in about.limitations %}<li class="small">{{ l }}</li>{% endfor %}</ul>
+
+  <h2 id="access" style="margin-top:36px">Access</h2>
+  <p class="small">{{ about.approval }}</p>
+  {% if not user %}<a class="btn primary" href="/signup"><i data-lucide="sparkles"></i>Request access</a>{% endif %}
+
+  <p class="small muted" style="margin-top:36px">{{ about.disclaimer }}<br><strong>{{ about.signature }}</strong></p>
+</main>
+{% endblock %}

@@ -15,7 +15,27 @@ PROVIDER_LABELS = {"anthropic": "Anthropic Claude", "openai": "OpenAI", "google"
 
 
 class ProviderError(Exception):
-    pass
+    """kind: auth | quota | billing | model | unavailable | network | unknown (drives user-facing guidance)."""
+
+    def __init__(self, message: str, status: int | None = None, kind: str = "unknown") -> None:
+        super().__init__(message)
+        self.status, self.kind = status, kind
+
+
+def classify(status: int, body: str) -> str:
+    low = body.lower()
+    if status in (401, 403) or "invalid api key" in low or "invalid x-api-key" in low or "api key not valid" in low:
+        return "auth"
+    if any(w in low for w in ("credit balance", "insufficient_quota", "billing", "exceeded your current quota",
+                              "payment", "quota exceeded")) or status == 402:
+        return "billing"
+    if status == 429:
+        return "quota"
+    if status == 404 or "model_not_found" in low or ("model" in low and ("not found" in low or "does not exist" in low)):
+        return "model"
+    if status >= 500 or status == 529:
+        return "unavailable"
+    return "unknown"
 
 
 @dataclass
@@ -46,7 +66,8 @@ def list_models(provider: str, api_key: str) -> list[str]:
         else:
             raise ProviderError("Unknown provider")
     if r.status_code != 200:
-        raise ProviderError(f"Key could not be validated (HTTP {r.status_code}).")
+        raise ProviderError(f"Key could not be validated (HTTP {r.status_code}).", r.status_code,
+                            classify(r.status_code, r.text[:500]))
     items = r.json().get(key, [])
     ids = [str(i.get("id") or i.get("name", "")).removeprefix("models/") for i in items]
     return sorted(i for i in ids if i)
@@ -63,7 +84,7 @@ def complete(provider: str, model: str, api_key: str, system: str, user_msg: str
             if provider == "google":
                 return _google(c, model, api_key, system, user_msg, max_tokens, temperature)
     except httpx.HTTPError as exc:
-        raise ProviderError(f"Provider request failed: {type(exc).__name__}") from exc
+        raise ProviderError(f"Provider request failed: {type(exc).__name__}", None, "network") from exc
     raise ProviderError("Unknown provider")
 
 
@@ -74,7 +95,8 @@ def _check(r: httpx.Response) -> dict:
             msg = msg.get("message", "") if isinstance(msg, dict) else str(msg)
         except ValueError:
             msg = ""
-        raise ProviderError(f"Provider returned HTTP {r.status_code}. {msg[:200]}")
+        raise ProviderError(f"Provider returned HTTP {r.status_code}. {msg[:200]}", r.status_code,
+                            classify(r.status_code, f"{msg} {r.text[:300]}"))
     return r.json()
 
 

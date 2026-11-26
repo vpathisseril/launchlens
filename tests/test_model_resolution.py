@@ -46,7 +46,7 @@ def _resolve(uid, **kw):
 def test_openai_default_uses_auto_model_instead_of_asking(client):
     uid = _user_with_keys(client, {"anthropic": [], "openai": OPENAI, "google": GOOGLE}, "openai")
     acc = _resolve(uid, task="answer")
-    assert (acc.provider, acc.model, acc.key_type) == ("openai", "gpt-5-mini", "byok")
+    assert (acc.provider, acc.model, acc.key_type) == ("openai", "gpt-5", "byok")  # accuracy-first default
     assert _resolve(uid, task="brief").model == "gpt-5"
 
 
@@ -59,7 +59,7 @@ def test_falls_back_to_another_valid_key_when_preferred_has_no_model(client):
 def test_agent_requesting_missing_provider_uses_users_key(client):
     uid = _user_with_keys(client, {"google": GOOGLE}, "google")
     acc = _resolve(uid, requested_provider="anthropic", requested_model="claude-opus-5-5")
-    assert acc.provider == "google" and acc.model == "gemini-2.5-flash"
+    assert acc.provider == "google" and acc.model == "gemini-2.5-pro"
 
 
 def test_asks_only_when_nothing_usable(client):
@@ -71,9 +71,9 @@ def test_asks_only_when_nothing_usable(client):
 def test_settings_show_ready_state_and_hub_error_points_to_routing(client):
     uid = _user_with_keys(client, {"openai": OPENAI}, "openai")
     page = client.get("/account/ai").text
-    assert "Ready:" in page and "gpt-5-mini" in page and "Auto · gpt-5-mini" in page
+    assert "Ready:" in page and "Auto · gpt-5" in page and "Healthcare accuracy-first" in page
     with dbmod.session_factory()() as s:
-        assert effective_models(s, s.get(User, uid))["openai"] == {"answer": "gpt-5-mini", "brief": "gpt-5"}
+        assert effective_models(s, s.get(User, uid))["openai"] == {"answer": "gpt-5", "brief": "gpt-5"}
         u = s.get(User, uid)
         u.preferred_models = {"available_openai": []}
         s.commit()
@@ -90,8 +90,11 @@ def test_choosing_auto_clears_previous_choice(client):
                                             "openai_brief": ""})
     assert _resolve(uid).model == "gpt-4.1"
     client.post("/account/ai/models", data={"csrf_token": tok, "preferred_provider": "openai", "openai_answer": "",
-                                            "openai_brief": ""})
-    assert _resolve(uid).model == "gpt-5-mini"
+                                            "openai_brief": "", "profile": "balanced"})
+    assert _resolve(uid).model == "gpt-5-mini"  # balanced → light model for answers
+    assert _resolve(uid, task="brief").model == "gpt-5"
+    client.post("/account/ai/models", data={"csrf_token": tok, "preferred_provider": "openai", "profile": "cost"})
+    assert _resolve(uid, task="brief").model == "gpt-5-mini"
 
 
 def test_rank_models_keeps_newest_even_with_cap():
@@ -108,5 +111,5 @@ def test_refresh_model_lists_endpoint(client, api_mock):
     tok = csrf(client, "/account/ai")
     r = client.post("/account/ai/refresh-models", data={"csrf_token": tok}, follow_redirects=False)
     assert "saved=1" in r.headers["location"]
-    assert _resolve(uid).model == "gpt-5-mini"
+    assert _resolve(uid).model == "gpt-5"
     assert isinstance(httpx, object)

@@ -18,7 +18,7 @@
         <select id="use_case" name="use_case">{% for u in use_cases %}<option {{ 'selected' if form.use_case == u }}>{{ u }}</option>{% endfor %}</select></div>
       <div class="field"><label for="password">Password</label><input id="password" name="password" type="password" required minlength="12" autocomplete="new-password">
         <div class="hint">At least 12 characters, using at least three of: lowercase, uppercase, numbers, symbols.</div></div>
-      <label class="check"><input type="checkbox" name="terms"> I understand LaunchLens is a research prototype using public data only. It is not promotional material and not legal, financial, or medical advice.</label>
+      <label class="check"><input type="checkbox" name="terms"> {{ site.terms }}</label>
       <br><button class="btn primary lg" style="width:100%;justify-content:center"><i data-lucide="send"></i>Request access</button>
     </form>
     <p class="small muted" style="margin-top:14px">Already approved? <a href="/login">Sign in</a></p>

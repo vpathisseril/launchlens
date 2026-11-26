@@ -11,8 +11,14 @@
   <div class="card">
     <div class="card-head"><h3><i data-lucide="cpu"></i>{{ labels[p] }}</h3><div class="spacer"></div>
       {% if k and k.is_valid %}<span class="pill pill-ok">Valid · ••••{{ k.key_last4 }}</span>
+      {% elif k %}<span class="pill pill-bad">Rejected · ••••{{ k.key_last4 }}</span>
       {% elif p in default_available %}<span class="pill pill-warn">Shared default</span>{% else %}<span class="pill">Not set</span>{% endif %}</div>
-    {% if k %}
+    {% if k and not k.is_valid %}
+      <p class="small" style="color:var(--danger)">{{ labels[p] }} rejected this key. Paste a new one to replace it.</p>
+      <form method="post" action="/onboarding/ai-keys/byok"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="provider" value="{{ p }}"><input type="hidden" name="back" value="/account/ai">
+        <div class="field"><input name="api_key" type="password" placeholder="Paste new {{ labels[p] }} key" aria-label="New {{ labels[p] }} API key" required autocomplete="off"></div>
+        <button class="btn sm primary"><i data-lucide="shield-check"></i>Validate & replace</button></form>
+    {% elif k %}
       <p class="small muted">Validated {{ k.validated_at.strftime('%Y-%m-%d') if k.validated_at }} {{ ('· ' ~ k.label) if k.label }}</p>
       <form method="post" action="/account/ai/delete"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="provider" value="{{ p }}"><button class="btn sm danger"><i data-lucide="trash-2"></i>Remove key</button></form>
     {% else %}
@@ -34,6 +40,10 @@
   {% endif %}
   <form method="post" action="/account/ai/models">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label>Research profile</label>
+      <div class="grid g3">{% for k, pr in profiles.items() %}
+        <label class="choice" style="padding:12px"><span class="check"><input type="radio" name="profile" value="{{ k }}" {{ 'checked' if profile == k }}>
+          <span><strong>{{ pr.label }}</strong><br><span class="tiny muted">{{ pr.help }}</span></span></span></label>{% endfor %}</div></div>
     <div class="field" style="max-width:320px"><label for="pp">Preferred provider</label>
       <select id="pp" name="preferred_provider">{% for p in providers %}<option value="{{ p }}" {{ 'selected' if user.preferred_provider == p }}>{{ labels[p] }}</option>{% endfor %}</select></div>
     <div class="table-wrap"><table><thead><tr><th>Provider</th><th>Answer model</th><th>Brief model</th></tr></thead><tbody>

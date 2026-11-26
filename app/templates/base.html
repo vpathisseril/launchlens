@@ -26,6 +26,7 @@
       <a href="/projects" class="{{ 'active' if request.url.path.startswith('/projects') }}"><i data-lucide="folder-kanban"></i>Projects</a>
       {% if module_keys and 'agents' in module_keys %}<a href="/agents" class="{{ 'active' if request.url.path.startswith('/agents') }}"><i data-lucide="bot"></i>Agents</a>{% endif %}
       {% if user.role.value == 'admin' %}<a href="/admin" class="{{ 'active' if request.url.path.startswith('/admin') }}"><i data-lucide="settings-2"></i>Admin</a>{% endif %}
+      <a href="/about" class="{{ 'active' if request.url.path == '/about' }}"><i data-lucide="info"></i>About</a>
     </nav>
     <div class="spacer"></div>
     <div class="tb-actions">
@@ -48,14 +49,14 @@
     </div>
     {% else %}
     <div class="spacer"></div>
-    <div class="tb-actions"><a class="btn ghost" href="/login">Sign in</a><a class="btn primary" href="/signup">Request access</a></div>
+    <div class="tb-actions"><a class="btn ghost" href="/about">About</a><a class="btn ghost" href="/login">Sign in</a><a class="btn primary" href="/signup">Request access</a></div>
     {% endif %}
   </div>
 </header>
 {% block body %}{% endblock %}
 <footer class="footer">
-  <strong>LaunchLens</strong> · Research prototype — not promotional material, not legal, financial, or medical advice · Public data only ·
-  <strong>By Varghese Pathisseril · VP+AI</strong>
+  <strong>{{ site.name }}</strong> v{{ site.version }} · {{ site.disclaimer }} · <a href="/about">About</a> ·
+  <strong>{{ site.signature }}</strong>
 </footer>
 <script src="/static/vendor/htmx.min.js" nonce="{{ request.state.nonce }}"></script>
 <script src="/static/vendor/echarts.min.js" nonce="{{ request.state.nonce }}"></script>

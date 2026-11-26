@@ -200,10 +200,18 @@ def ai_gov(request: Request, admin: User = Depends(require_admin), db: Session =
         spend[e.user_id] += e.est_cost_usd
     top = sorted(spend.items(), key=lambda kv: -kv[1])[:10]
     names = {u.id: u.email for u in db.scalars(select(User).where(User.id.in_([k for k, _ in top])))} if top else {}
-    from app.services.ai_access import default_key_for
+    from app.agents.providers import PROVIDER_LABELS
+    from app.services.ai_access import PROFILES, default_key_for
+    state = {}
+    for p in pols:
+        missing = [m for m, ok in (("secret DEFAULT_" + p.provider.upper() + "_KEY", bool(default_key_for(p.provider))),
+                                   ("at least one allowlisted model", bool(p.model_allowlist)),
+                                   ("Enabled checkbox", p.is_enabled)) if not ok]
+        state[p.provider] = ("Active", "") if not missing else ("Inactive", "Needs " + ", ".join(missing) + ".")
     return templates.TemplateResponse(request, "admin/ai.html", app_ctx(
         request, db, admin, pols=pols, prices=prices, top=[(names.get(k, k), v) for k, v in top],
-        has_key={p.provider: bool(default_key_for(p.provider)) for p in pols}))
+        has_key={p.provider: bool(default_key_for(p.provider)) for p in pols}, state=state,
+        labels=PROVIDER_LABELS, profiles=PROFILES))
 
 
 @router.post("/ai/policy/{pid}", dependencies=[Depends(verify_csrf)])
@@ -215,7 +223,10 @@ def policy_save(request: Request, pid: int, allowlist: str = Form(""), max_token
         raise HTTPException(404)
     before = {"allow": p.model_allowlist, "max_tokens": p.max_tokens_per_call, "cpd": p.calls_per_day,
               "budget": p.monthly_budget_usd, "enabled": p.is_enabled}
-    p.model_allowlist = [m.strip() for m in allowlist.split(",") if m.strip()][:10]
+    allow = [m.strip() for m in allowlist.split(",") if m.strip()][:10]
+    if enabled == "on" and not allow:
+        return RedirectResponse(f"/admin/ai?err=allowlist&provider={p.provider}", status_code=303)
+    p.model_allowlist = allow
     p.max_tokens_per_call = max(50, min(4000, max_tokens))
     p.calls_per_day = max(0, min(1000, calls_per_day))
     p.monthly_budget_usd = max(0.0, budget)

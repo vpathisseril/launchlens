@@ -49,3 +49,11 @@
   </div>
 </details>
 {%- endmacro %}
+
+{% macro ai_error(fe) -%}
+<div class="alert {{ 'err' if fe.level == 'err' else 'warn' }}" role="alert">
+  <i data-lucide="{{ 'circle-x' if fe.level == 'err' else 'triangle-alert' }}"></i>
+  <div><strong>{{ fe.title }}</strong><br><span class="small">{{ fe.detail }}</span>
+    {% if fe.action_url %}<br><a class="btn sm primary" href="{{ fe.action_url }}" style="margin-top:8px"><i data-lucide="settings-2"></i>{{ fe.action_label }}</a>{% endif %}</div>
+</div>
+{%- endmacro %}

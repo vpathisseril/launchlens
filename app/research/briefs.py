@@ -4,14 +4,12 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.content.about import DISCLAIMER, SIGNATURE  # single source of truth
 from app.hubs import HUBS
 from app.models import Brief, ResearchProject, User
 from app.research.agent import GUARDRAIL, verify
 from app.services import ai_access
 
-DISCLAIMER = ("Research prototype — not promotional material, not legal, financial, or medical advice. Medicare data "
-              "is a proxy for the total US market.")
-SIGNATURE = "By Varghese Pathisseril · VP+AI"
 SECTIONS = ["Situation", "Market access", "Pricing policy", "Policy watch", "Where to win (targeting)",
             "Competitive differentiation", "Risks", "Next 90 days", "Data notes"]
 

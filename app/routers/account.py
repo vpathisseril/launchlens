@@ -27,7 +27,8 @@ def _ai_ctx(db: Session, user: User) -> dict:
     models = {p: [m.model for m in db.scalars(select(ModelPrice).where(ModelPrice.provider == p))] for p in PROVIDERS}
     return {"keys": keys, "policies": pols, "default_available": avail, "providers": PROVIDERS,
             "labels": PROVIDER_LABELS, "calls_today": ai_access.calls_today(db, user), "models": models,
-            "effective": ai_access.effective_models(db, user)}
+            "effective": ai_access.effective_models(db, user), "profiles": ai_access.PROFILES,
+            "profile": ai_access.profile_of(user)}
 
 
 @router.get("/onboarding/ai-keys", response_class=HTMLResponse)
@@ -41,14 +42,19 @@ def onboarding(request: Request, user: User = Depends(require_login), db: Sessio
 def save_key(request: Request, provider: str = Form(...), api_key: str = Form(...), label: str = Form(""),
              back: str = Form("/app"), user: User = Depends(require_login), db: Session = Depends(get_db)):  # noqa: ANN201
     tpl = "account/onboarding.html" if back == "/app" else "account/ai_access.html"
+    from app.routers.research import app_ctx
+
+    def page(error: str):  # noqa: ANN202
+        base = app_ctx(request, db, user, error=error, **_ai_ctx(db, user)) if tpl.endswith("ai_access.html") \
+            else ctx(request, user, error=error, **_ai_ctx(db, user))
+        return templates.TemplateResponse(request, tpl, base, 400)
     if provider not in PROVIDERS or len(api_key.strip()) < 12:
-        return templates.TemplateResponse(request, tpl, ctx(request, user, error="Choose a provider and paste a key.",
-                                                            **_ai_ctx(db, user)), 400)
+        return page("Choose a provider and paste a key.")
     try:
         ai_access.save_byok(db, user, provider, api_key, label)
-    except ProviderError:
-        return templates.TemplateResponse(request, tpl, ctx(request, user, error="Key could not be validated. Nothing "
-                                                            "was stored.", **_ai_ctx(db, user)), 400)
+    except ProviderError as exc:
+        from app.services.ai_errors import for_key_validation
+        return page(for_key_validation(exc, provider))
     return RedirectResponse("/account/ai?saved=1" if back != "/app" else "/account/ai?welcome=1", status_code=303)
 
 
@@ -65,7 +71,8 @@ def use_default(request: Request, understand: str = Form(""), user: User = Depen
 def ai_settings(request: Request, user: User = Depends(require_login), db: Session = Depends(get_db)):  # noqa: ANN201
     if user.ai_key_status == AiKeyStatus.none:
         return RedirectResponse("/onboarding/ai-keys", status_code=303)
-    return templates.TemplateResponse(request, "account/ai_access.html", ctx(request, user, **_ai_ctx(db, user)))
+    from app.routers.research import app_ctx
+    return templates.TemplateResponse(request, "account/ai_access.html", app_ctx(request, db, user, **_ai_ctx(db, user)))
 
 
 @router.post("/account/ai/models", dependencies=[Depends(verify_csrf)])
@@ -83,6 +90,9 @@ async def save_models(request: Request, user: User = Depends(require_login), db:
             else:
                 cur.pop(task, None)  # back to Auto
         prefs[p] = cur
+    prof = str(form.get("profile", ""))
+    if prof in ai_access.PROFILES:
+        prefs["_profile"] = prof
     prov = str(form.get("preferred_provider", user.preferred_provider))
     if prov in PROVIDERS:
         user.preferred_provider = prov
@@ -138,5 +148,6 @@ def set_theme(request: Request, theme: str = Form(...), user: User = Depends(req
 
 
 @router.get("/account/themes", response_class=HTMLResponse)
-def themes(request: Request, user: User = Depends(require_login)):  # noqa: ANN201
-    return templates.TemplateResponse(request, "account/themes.html", ctx(request, user, themes=THEMES))
+def themes(request: Request, user: User = Depends(require_login), db: Session = Depends(get_db)):  # noqa: ANN201
+    from app.routers.research import app_ctx
+    return templates.TemplateResponse(request, "account/themes.html", app_ctx(request, db, user, themes=THEMES))

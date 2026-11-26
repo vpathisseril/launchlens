@@ -6,10 +6,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.content import about
 from app.core.db import get_db
 from app.core.deps import ctx, optional_user, templates, verify_csrf
 from app.core.security import limiter, password_strength_ok, verify_password
-from app.hubs import HUBS
 from app.models import User, UserStatus, utcnow
 from app.services import accounts
 from app.services.audit import audit
@@ -25,9 +25,13 @@ def _ip(request: Request) -> str:
 
 
 @router.get("/", response_class=HTMLResponse)
-def landing(request: Request, user: User | None = Depends(optional_user)):  # noqa: ANN201
-    return templates.TemplateResponse(request, "public/landing.html",
-                                      ctx(request, user, hubs=sorted(HUBS.values(), key=lambda h: h.info.rank)))
+def landing(request: Request, user: User | None = Depends(optional_user), db: Session = Depends(get_db)):  # noqa: ANN201
+    return templates.TemplateResponse(request, "public/landing.html", ctx(request, user, about=about.build(db)))
+
+
+@router.get("/about", response_class=HTMLResponse)
+def about_page(request: Request, user: User | None = Depends(optional_user), db: Session = Depends(get_db)):  # noqa: ANN201
+    return templates.TemplateResponse(request, "public/about.html", ctx(request, user, about=about.build(db)))
 
 
 @router.get("/signup", response_class=HTMLResponse)

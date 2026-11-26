@@ -62,6 +62,10 @@ flowchart LR
 - **Stack:** Python 3.12, FastAPI, SQLAlchemy 2, PostgreSQL (SQLite locally), Jinja2 + HTMX, ECharts, Lucide.
 - **Module docs** (the spec the app was built from): `CLAUDE.md` + `docs/modules/*.md`. **Decisions:** `docs/DECISIONS.md`.
 
+## About page
+The in-app **/about** page is the single source of truth for what LaunchLens is, its hubs, AI key policy
+(live shared-key limits), research profiles, data sources with refresh cadence, and limitations.
+
 ## Run locally
 ```bash
 pip install -r requirements-dev.txt

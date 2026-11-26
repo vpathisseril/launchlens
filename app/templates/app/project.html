@@ -1,5 +1,5 @@
 {% extends "app_shell.html" %}
-{% from "_macros.html" import lineage %}
+{% from "_macros.html" import lineage, ai_error %}
 {% block title %}{{ p.title }}{% endblock %}
 {% block content %}
 <div class="page-head"><div><div class="eyebrow">Research project</div><h1>{{ p.title }}</h1>
@@ -11,8 +11,7 @@
 </div>
 {% set err = request.query_params.get('err') %}
 {% if err == 'empty' %}<div class="alert warn">Pin at least one finding first.</div><br>
-{% elif err == 'NeedsModelChoice' %}<div class="alert warn">Your key is valid but no model is selected. <a href="/account/ai#routing">Choose a model</a>, or use the no-AI summary.</div><br>
-{% elif err %}<div class="alert err">The AI brief couldn't be generated ({{ err }}). Check <a href="/account/ai">AI access</a> or use the no-AI summary.</div><br>{% endif %}
+{% elif fe %}{{ ai_error(fe) }}<p class="small muted">You can still create a <strong>Summary (no AI)</strong> right away.</p>{% endif %}
 
 <div class="kanban">
   {% for hk, items in by_hub.items() %}{% set h = hubs.get(hk) %}

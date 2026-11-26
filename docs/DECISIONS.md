@@ -46,3 +46,19 @@ policy feed → baseline → scope warm-up → housekeeping in one process. "Due
 older than each source's cadence (7/30/90 days); new CMS data years are detected via the weekly catalog check
 (new URL). Single-flight lock (Postgres advisory lock), 20-min budget, 25-scope cap, memory released per scope,
 cache pruning, and no LLM calls (asserted via usage-event count).
+
+**ADR-014 · One catalogue of user-facing AI messages.** `app/services/ai_errors.py` maps every failure (shared-key
+quota/budget, no access, model choice, provider auth/billing/rate-limit/model/outage) to a title, a plain-language fix
+and a direct link. Only the shared default key carries LaunchLens limits; provider limits on personal keys are labelled
+as provider limits. A key the provider rejects is marked invalid and the request retries once with the user's other
+valid key; forced onboarding resumes only when no usable key remains.
+
+**ADR-015 · Healthcare model profiles instead of a "medical model".** The Anthropic, OpenAI and Gemini APIs used here
+offer no dedicated medical model (MedGemma is open-weights/self-hosted). Domain fit comes from an accuracy-first default
+profile (flagship models for answers and briefs), Balanced and Cost-saver alternatives, and healthcare guardrails in
+every prompt (exact regulatory terms, labelled indication vs. trial endpoint, no efficacy/safety inference, no
+patient-level speculation).
+
+**ADR-016 · Single source of truth for "About".** `app/content/about.py` holds all product wording once; live facts
+(approval window, shared-key limits, sources and refresh cadence, profiles, hubs) are read at request time. The About
+page, landing page, footer, sign-up terms and briefs all render from it.

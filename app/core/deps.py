@@ -15,6 +15,15 @@ from app.models import AiKeyStatus, Module, Role, User, UserModule, UserStatus
 templates = Jinja2Templates(directory="app/templates")
 
 
+def _site_globals() -> None:
+    from app.content import about
+    templates.env.globals["site"] = {"name": about.NAME, "signature": about.SIGNATURE, "disclaimer": about.DISCLAIMER,
+                                     "terms": about.TERMS, "version": about.VERSION}
+
+
+_site_globals()
+
+
 class RedirectTo(Exception):  # noqa: N818 — control-flow signal, handled in main
     def __init__(self, url: str) -> None:
         self.url = url

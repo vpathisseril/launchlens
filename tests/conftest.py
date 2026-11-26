@@ -191,10 +191,33 @@ def _api_routes(mock: respx.MockRouter) -> None:
         req.headers.get("x-api-key") == "sk-ant-test-default-0000" else 401,
         json={"data": [{"id": "claude-haiku-5-5"}, {"id": "claude-sonnet-5-5"}]}))
     mock.post("https://api.anthropic.com/v1/messages").mock(side_effect=_fake_claude)
+    mock.get("https://api.openai.com/v1/models").mock(side_effect=lambda req: httpx.Response(
+        200 if req.headers.get("authorization", "").startswith("Bearer sk-proj-good") else 401,
+        json={"data": [{"id": "gpt-5"}, {"id": "gpt-5-mini"}, {"id": "text-embedding-3-small"}]}))
+    mock.post("https://api.openai.com/v1/chat/completions").mock(side_effect=_fake_openai_chat)
+
+
+# Test switch: set PROVIDER_FAIL["anthropic"] = (status, body) to simulate a provider error on the next calls.
+PROVIDER_FAIL: dict[str, tuple[int, dict] | None] = {"anthropic": None, "openai": None}
+
+
+def _fake_openai_chat(request: httpx.Request) -> httpx.Response:
+    import json
+    if PROVIDER_FAIL["openai"]:
+        st, body = PROVIDER_FAIL["openai"]
+        return httpx.Response(st, json=body)
+    msg = json.loads(request.content)["messages"][-1]["content"]
+    nums = re.findall(r"IPAY (\d{4})", msg)
+    text = f"OpenAI answer: {nums[0]} [1]." if nums else "This is not in the available data."
+    return httpx.Response(200, json={"choices": [{"message": {"content": text}}],
+                                     "usage": {"prompt_tokens": 900, "completion_tokens": 40}})
 
 
 def _fake_claude(request: httpx.Request) -> httpx.Response:
     import json
+    if PROVIDER_FAIL["anthropic"]:
+        st, body = PROVIDER_FAIL["anthropic"]
+        return httpx.Response(st, json=body)
     body = json.loads(request.content)
     msg = body["messages"][0]["content"]
     if "Executive Launch Brief" in msg or "executive brief" in msg:
@@ -209,6 +232,7 @@ def _fake_claude(request: httpx.Request) -> httpx.Response:
 
 @pytest.fixture()
 def api_mock():
+    PROVIDER_FAIL.update(anthropic=None, openai=None)
     with respx.mock(assert_all_called=False) as mock:
         _api_routes(mock)
         yield mock

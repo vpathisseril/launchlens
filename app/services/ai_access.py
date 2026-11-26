@@ -27,6 +27,31 @@ from app.services.audit import audit
 
 TASKS = ("route", "answer", "brief")  # economy → standard → premium
 
+# Healthcare & life-sciences profiles (ADR-015). No dedicated medical model is offered through the Anthropic, OpenAI
+# or Gemini APIs used here (MedGemma is open-weights / self-hosted only), so domain fit comes from routing pharma
+# research to each provider's strongest current model plus healthcare guardrails in every prompt.
+PROFILES = {
+    "accuracy": {"label": "Healthcare accuracy-first (recommended)",
+                 "help": "Flagship models for every research answer and brief: best for clinical, regulatory and "
+                         "market-access nuance. Highest cost on your key.",
+                 "tiers": {"route": "economy", "answer": "standard", "brief": "premium"},
+                 "pick": {"route": "light", "answer": "heavy", "brief": "heavy"}},
+    "balanced": {"label": "Balanced",
+                 "help": "Fast mid-tier models for answers, flagship for executive briefs.",
+                 "tiers": {"route": "economy", "answer": "standard", "brief": "premium"},
+                 "pick": {"route": "light", "answer": "light", "brief": "heavy"}},
+    "cost": {"label": "Cost-saver",
+             "help": "Light models everywhere. Good for exploration; verify important findings.",
+             "tiers": {"route": "economy", "answer": "economy", "brief": "standard"},
+             "pick": {"route": "light", "answer": "light", "brief": "light"}},
+}
+DEFAULT_PROFILE = "accuracy"
+
+
+def profile_of(user: User) -> str:
+    p = (user.preferred_models or {}).get("_profile")
+    return p if p in PROFILES else DEFAULT_PROFILE
+
 
 class QuotaExceeded(Exception):
     pass
@@ -194,10 +219,11 @@ def resolve_access(db: Session, user: User, task: str = "answer", requested_mode
 
 def model_for(db: Session, user: User, provider: str, task: str) -> str | None:
     prefs = (user.preferred_models or {}).get(provider, {}) or {}
+    prof = PROFILES[profile_of(user)]
     chosen = prefs.get(task) or (prefs.get("answer") if task == "route" else None)
-    return chosen or _fallback_model(db, provider, task) or \
-        pick_from_available((user.preferred_models or {}).get("available_" + provider) or [], task) or \
-        prefs.get("answer")
+    return chosen or _fallback_model(db, provider, task, prof["tiers"].get(task)) or \
+        pick_from_available((user.preferred_models or {}).get("available_" + provider) or [],
+                            prof["pick"].get(task, "light")) or prefs.get("answer")
 
 
 _SKIP = re.compile(r"(\d{4}-\d{2}-\d{2}|-\d{4}$|\d{8}|preview|exp|audio|realtime|search|tts|transcri|embed|image|vision"
@@ -211,8 +237,9 @@ def _version(m: str) -> tuple[float, ...]:
 
 
 def pick_from_available(models: list[str], task: str) -> str | None:
-    """Choose a sensible current model from the provider's own list (newest stable; light tier for answers,
-    flagship for briefs). Dated snapshots, previews and non-chat models are skipped."""
+    """Choose a sensible current model from the provider's own list. `task` is 'light'/'heavy' (or a task name:
+    route/answer → light, brief → heavy). Newest stable wins; dated snapshots, previews and non-chat models skipped."""
+    task = {"light": "answer", "heavy": "brief"}.get(task, task)
     cands = [m for m in models if not _SKIP.search(m)] or list(models)
     if not cands:
         return None
@@ -259,9 +286,25 @@ def _resolve_default(db: Session, user: User, requested_model: str | None, reque
                           min(max_tokens, pol.max_tokens_per_call), notice)
 
 
-def _fallback_model(db: Session, provider: str, task: str) -> str | None:
-    tier = {"route": "economy", "answer": "standard", "brief": "premium"}.get(task, "standard")
+def _fallback_model(db: Session, provider: str, task: str, tier: str | None = None) -> str | None:
+    tier = tier or {"route": "economy", "answer": "standard", "brief": "premium"}.get(task, "standard")
     return tier_model(db, provider, tier) or tier_model(db, provider, "standard") or tier_model(db, provider, "economy")
+
+
+def _has_valid_key(db: Session, user: User) -> bool:
+    return db.scalar(select(func.count()).select_from(UserApiKey).where(
+        UserApiKey.user_id == user.id, UserApiKey.is_valid.is_(True))) > 0
+
+
+def _invalidate_key(db: Session, user: User, provider: str) -> None:
+    """A provider rejected the key (401/403): stop using it; ask the user to update it only if nothing else works."""
+    row = db.scalar(select(UserApiKey).where(UserApiKey.user_id == user.id, UserApiKey.provider == provider))
+    if row:
+        row.is_valid = False
+        audit(db, user.id, "byok_rejected_by_provider", "user_api_key", provider)
+    if not _has_valid_key(db, user) and user.ai_key_status == AiKeyStatus.byok_valid:
+        user.ai_key_status = AiKeyStatus.none  # forced onboarding resumes on next page load
+    db.commit()
 
 
 def estimate_cost(db: Session, provider: str, model: str, tin: int, tout: int) -> float:
@@ -273,7 +316,7 @@ def estimate_cost(db: Session, provider: str, model: str, tin: int, tout: int) -
 
 def llm_call(db: Session, user: User, system: str, user_msg: str, *, task: str = "answer", hub_key: str = "",
              agent_id: int | None = None, model: str | None = None, provider: str | None = None,
-             max_tokens: int = 900, temperature: float = 0.2, use_cache: bool = True
+             max_tokens: int = 900, temperature: float = 0.2, use_cache: bool = True, _retry: bool = True
              ) -> tuple[str, UsageEvent, ResolvedAccess]:
     try:
         access = resolve_access(db, user, task, model, provider, max_tokens)
@@ -295,12 +338,17 @@ def llm_call(db: Session, user: User, system: str, user_msg: str, *, task: str =
     try:
         comp = providers.complete(access.provider, access.model, access.api_key, system, user_msg,
                                   access.max_tokens, temperature)
-    except providers.ProviderError:
-        status = "error"
+    except providers.ProviderError as exc:
         db.add(UsageEvent(user_id=user.id, agent_id=agent_id, hub_key=hub_key, provider=access.provider,
-                          model=access.model, key_type=access.key_type, status=status,
+                          model=access.model, key_type=access.key_type, status="error:" + exc.kind,
                           latency_ms=int((time.monotonic() - t0) * 1000)))
         db.commit()
+        exc.provider, exc.key_type, exc.model = access.provider, access.key_type, access.model  # type: ignore[attr-defined]
+        if access.key_type == "byok" and exc.kind == "auth" and _retry:
+            _invalidate_key(db, user, access.provider)
+            if _has_valid_key(db, user):  # transparently retry with the user's other key
+                return llm_call(db, user, system, user_msg, task=task, hub_key=hub_key, agent_id=agent_id,
+                                max_tokens=max_tokens, temperature=temperature, use_cache=use_cache, _retry=False)
         raise
     ev = UsageEvent(user_id=user.id, agent_id=agent_id, hub_key=hub_key, provider=access.provider, model=access.model,
                     key_type=access.key_type, tokens_in=comp.tokens_in, tokens_out=comp.tokens_out,

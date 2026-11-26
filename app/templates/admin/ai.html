@@ -1,12 +1,15 @@
 {% extends "app_shell.html" %}
 {% block title %}AI governance{% endblock %}
 {% block content %}
-<div class="page-head"><div><div class="eyebrow">Admin</div><h1>AI governance</h1><p>Shared default-key policy, the model registry and price table, and top spenders. Users on their own keys are never limited.</p></div></div>
+<div class="page-head"><div><div class="eyebrow">Admin</div><h1>AI governance</h1><p>Limits apply <strong>only to the shared default key</strong>. Users on their own keys are never limited by LaunchLens. A provider's shared key is <em>Active</em> only when its secret is set, at least one model is allowlisted and it's enabled.</p></div></div>
+{% if request.query_params.get('err') == 'allowlist' %}<div class="alert err">Add at least one model to the {{ request.query_params.get('provider') }} allowlist before enabling it. Nothing was saved.</div><br>{% endif %}
 <div class="grid g3">
 {% for p in pols %}
   <form method="post" action="/admin/ai/policy/{{ p.id }}" class="card"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <div class="card-head"><h3><i data-lucide="cpu"></i>{{ p.provider|capitalize }}</h3><div class="spacer"></div>
-      {% if has_key[p.provider] %}<span class="pill pill-ok">Secret set</span>{% else %}<span class="pill pill-bad">No DEFAULT_{{ p.provider|upper }}_KEY</span>{% endif %}</div>
+    <div class="card-head"><h3><i data-lucide="cpu"></i>{{ labels.get(p.provider, p.provider) }}</h3><div class="spacer"></div>
+      <span class="pill {{ 'pill-ok' if state[p.provider][0] == 'Active' else 'pill-bad' }}">{{ state[p.provider][0] }}</span></div>
+    {% if state[p.provider][1] %}<p class="tiny muted">{{ state[p.provider][1] }}</p>{% endif %}
+    <p class="tiny muted">Secret: {% if has_key[p.provider] %}<span class="pill pill-ok">DEFAULT_{{ p.provider|upper }}_KEY set</span>{% else %}<span class="pill">DEFAULT_{{ p.provider|upper }}_KEY not set</span>{% endif %}</p>
     <div class="field"><label>Model allowlist (comma-separated)</label><input type="text" name="allowlist" value="{{ p.model_allowlist|join(', ') }}"></div>
     <div class="grid g3">
       <div class="field"><label>Max tokens/call</label><input type="number" name="max_tokens" value="{{ p.max_tokens_per_call }}"></div>
@@ -21,7 +24,7 @@
 <div class="grid g3" style="margin-top:18px">
   <div class="card span2">
     <h3><i data-lucide="tags"></i>Model registry & prices</h3>
-    <p class="small muted">Tiers drive routing (economy → routing/shared key, standard → answers, premium → briefs). Enter prices from your provider's current price list so cost analytics are accurate.</p>
+    <p class="small muted">Tiers drive routing for keys whose models are registered here. Healthcare profiles: <strong>{{ profiles.accuracy.label }}</strong> (default) uses standard for answers and premium for briefs; <strong>{{ profiles.balanced.label }}</strong> the same tiers with light models where the provider list is used; <strong>{{ profiles.cost.label }}</strong> economy/standard. The shared key always uses its allowlisted (economy) model. For OpenAI and Gemini, models come from each user's own provider list automatically. Enter prices from the provider's current price list so cost analytics are accurate.</p>
     <div class="table-wrap"><table><thead><tr><th>Provider</th><th>Model</th><th>Tier</th><th class="num">$ / M in</th><th class="num">$ / M out</th><th>Updated</th></tr></thead><tbody>
       {% for m in prices %}<tr><td>{{ m.provider }}</td><td class="mono">{{ m.model }}</td><td>{{ m.tier }}</td><td class="num">{{ m.usd_per_mtok_in }}</td><td class="num">{{ m.usd_per_mtok_out }}</td><td>{{ m.updated_at.strftime('%Y-%m-%d') }}{% if not m.usd_per_mtok_in %} <span class="pill pill-warn">set price</span>{% endif %}</td></tr>{% endfor %}
     </tbody></table></div><br>
