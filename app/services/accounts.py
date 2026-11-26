@@ -118,6 +118,39 @@ def ensure_admin(db: Session) -> None:
     db.commit()
 
 
+def apply_admin_reset(db: Session) -> bool:
+    """Emergency recovery via the ADMIN_RESET_PASSWORD secret (ADR-017).
+
+    Resets (or re-creates) the ADMIN_EMAIL admin with that password, re-activates it and forces a password change at
+    next sign-in. Applied once per distinct secret value (its hash is remembered), so later restarts don't undo the
+    new password the admin chooses. Remove the secret afterwards.
+    """
+    s = get_settings()
+    secret = s.admin_reset_password
+    if not secret:
+        return False
+    marker = sha256("admin-reset:" + secret)
+    if get_setting(db, "admin_reset_applied", "") == marker:
+        return False
+    email = s.admin_email.strip().lower()
+    admin = db.scalar(select(User).where(User.email == email))
+    if admin is None:
+        admin = User(email=email, name="Administrator", password_hash="", role=Role.admin,
+                     approved_at=utcnow(), approval_source="admin")
+        db.add(admin)
+    admin.password_hash = hash_password(secret)
+    admin.role, admin.status, admin.must_change_password = Role.admin, UserStatus.approved, True
+    set_setting(db, "admin_reset_applied", marker)
+    db.flush()
+    audit(db, None, "admin_password_reset_via_secret", "user", admin.id, after={"email": email})
+    db.commit()
+    return True
+
+
+def admin_emails(db: Session) -> list[str]:
+    return list(db.scalars(select(User.email).where(User.role == Role.admin).order_by(User.email)))
+
+
 def start_password_reset(db: Session, email: str) -> None:
     user = db.scalar(select(User).where(User.email == email.strip().lower()))
     if not user:

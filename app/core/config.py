@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     admin_email: str = "admin@launchlens.app"
     admin_password: str = ""
     admin_notify_email: str = ""
+    # Emergency admin recovery (no SMTP needed): set this secret, restart/republish, sign in, then delete it.
+    admin_reset_password: str = ""
 
     # Shared default AI keys (restricted by policy)
     default_anthropic_key: str = ""

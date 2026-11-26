@@ -20,13 +20,16 @@ def init_db() -> None:
     import app.models  # noqa: F401 — register models
     from app.core.schema_upgrade import upgrade
     from app.data.seed import seed
-    from app.services.accounts import ensure_admin
+    from app.services.accounts import apply_admin_reset, ensure_admin
 
     Base.metadata.create_all(get_engine())
     upgrade(get_engine())
     with session_factory()() as db:
         seed(db)
         ensure_admin(db)
+        if apply_admin_reset(db):
+            logging.getLogger("launchlens").warning(
+                "Admin password reset from ADMIN_RESET_PASSWORD. Sign in, choose a new password, then delete the secret.")
 
 
 def create_app() -> FastAPI:

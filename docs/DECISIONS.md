@@ -62,3 +62,8 @@ patient-level speculation).
 **ADR-016 · Single source of truth for "About".** `app/content/about.py` holds all product wording once; live facts
 (approval window, shared-key limits, sources and refresh cadence, profiles, hubs) are read at request time. The About
 page, landing page, footer, sign-up terms and briefs all render from it.
+
+**ADR-017 · Email-free admin recovery.** Setting the `ADMIN_RESET_PASSWORD` secret and restarting resets (or re-creates)
+the `ADMIN_EMAIL` admin with that password, re-activates it, forces a password change at next sign-in, and writes an
+audit entry. It is applied once per secret value (hash stored), so later restarts don't undo the admin's new
+password. `python -m scripts.admin_recovery --list` shows admin emails.
