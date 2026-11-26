@@ -134,11 +134,12 @@ def apply_admin_reset(db: Session) -> bool:
         return False
     email = s.admin_email.strip().lower()
     admin = db.scalar(select(User).where(User.email == email))
+    new_hash = hash_password(secret)
     if admin is None:
-        admin = User(email=email, name="Administrator", password_hash="", role=Role.admin,
+        admin = User(email=email, name="Administrator", password_hash=new_hash, role=Role.admin,
                      approved_at=utcnow(), approval_source="admin")
         db.add(admin)
-    admin.password_hash = hash_password(secret)
+    admin.password_hash = new_hash
     admin.role, admin.status, admin.must_change_password = Role.admin, UserStatus.approved, True
     set_setting(db, "admin_reset_applied", marker)
     db.flush()
