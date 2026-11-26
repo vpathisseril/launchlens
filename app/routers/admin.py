@@ -72,10 +72,23 @@ def overview(request: Request, admin: User = Depends(require_admin), db: Session
     by_day = Counter(e.at.date() for e in db.scalars(select(UsageEvent).where(UsageEvent.at >= now - timedelta(days=30))))
     trend = charts.line([d.strftime("%m-%d") for d in days], [("AI calls", [by_day.get(d, 0) for d in days])])
     fun = charts.bar([f for f, _ in funnel], [("Users", [n for _, n in funnel])])
+    from app.services.mailer import smtp_status
     return templates.TemplateResponse(request, "admin/overview.html", app_ctx(
-        request, db, admin, users=users, pending=pending, oldest=oldest, active7=active7, active30=active30,
+        request, db, admin, smtp=smtp_status(), smtp_result=request.session.pop("smtp_result", None),
+        users=users, pending=pending, oldest=oldest, active7=active7, active30=active30,
         cost_b=cost_b, cost_d=cost_d, runs_today=runs_today, stale=stale, trend=trend, funnel=fun,
         quota_hits=sum(1 for e in ev if e.status == "quota"), mode=accounts.approval_mode(db)))
+
+
+@router.post("/test-email", dependencies=[Depends(verify_csrf)])
+def test_email(request: Request, admin: User = Depends(require_admin), db: Session = Depends(get_db)):  # noqa: ANN201
+    from app.services.mailer import send_mail, smtp_status
+    to = str(smtp_status()["notify"])
+    ok, detail = send_mail(to, "LaunchLens test email", "Email delivery from LaunchLens is working.")
+    audit(db, admin.id, "smtp_test", "settings", "smtp", None, {"to": to, "ok": ok}, _ip(request))
+    db.commit()
+    request.session["smtp_result"] = {"ok": ok, "detail": detail}
+    return RedirectResponse("/admin#email", status_code=303)
 
 
 # ------------------------------------------------------------------ approvals

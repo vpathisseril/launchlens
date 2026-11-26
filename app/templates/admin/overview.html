@@ -1,5 +1,15 @@
 {% extends "app_shell.html" %}
-{% block title %}Admin overview{% endblock %}
+{% block title %}Admin overview<div class="card" id="email" style="margin-top:18px">
+  <div class="card-head"><h3><i data-lucide="mail"></i>Email (SMTP)</h3><div class="spacer"></div>
+    <span class="pill {{ 'pill-ok' if smtp.configured else 'pill-warn' }}">{{ 'Configured' if smtp.configured else 'Not configured' }}</span></div>
+  <p class="small muted">Used for access-request alerts, approval notices and password resets.
+    {% if smtp.configured %}Server <span class="mono">{{ smtp.host }}:{{ smtp.port }}</span> · sender <span class="mono">{{ smtp.from }}</span> · admin alerts to <span class="mono">{{ smtp.notify }}</span>.
+    {% else %}Add SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM and ADMIN_NOTIFY_EMAIL in Replit → Secrets, then republish.{% endif %}</p>
+  {% if smtp_result %}<div class="alert {{ 'ok' if smtp_result.ok else 'err' }}">{{ smtp_result.detail }}</div><br>{% endif %}
+  <form method="post" action="/admin/test-email"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="btn sm"><i data-lucide="send"></i>Send test email to {{ smtp.notify }}</button></form>
+</div>
+{% endblock %}
 {% block content %}
 <div class="page-head"><div><div class="eyebrow">Admin</div><h1>Platform overview</h1><p>Approvals, adoption, AI cost and data freshness at a glance.</p></div>
   <div class="spacer"></div><span class="pill pill-pri">Approval mode: {{ mode }}</span></div>
@@ -19,5 +29,15 @@
   <div class="card"><h3><i data-lucide="filter"></i>Adoption funnel</h3><p class="small muted">Signup → approved → AI onboarded → project → pinned finding → brief.</p>
     <div class="chart" data-chart="{{ funnel|tojson_attr }}"></div></div>
   <div class="card"><h3><i data-lucide="trending-up"></i>AI calls · last 30 days</h3><div class="chart" data-chart="{{ trend|tojson_attr }}"></div></div>
+</div>
+<div class="card" id="email" style="margin-top:18px">
+  <div class="card-head"><h3><i data-lucide="mail"></i>Email (SMTP)</h3><div class="spacer"></div>
+    <span class="pill {{ 'pill-ok' if smtp.configured else 'pill-warn' }}">{{ 'Configured' if smtp.configured else 'Not configured' }}</span></div>
+  <p class="small muted">Used for access-request alerts, approval notices and password resets.
+    {% if smtp.configured %}Server <span class="mono">{{ smtp.host }}:{{ smtp.port }}</span> · sender <span class="mono">{{ smtp.from }}</span> · admin alerts to <span class="mono">{{ smtp.notify }}</span>.
+    {% else %}Add SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM and ADMIN_NOTIFY_EMAIL in Replit → Secrets, then republish.{% endif %}</p>
+  {% if smtp_result %}<div class="alert {{ 'ok' if smtp_result.ok else 'err' }}">{{ smtp_result.detail }}</div><br>{% endif %}
+  <form method="post" action="/admin/test-email"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button class="btn sm"><i data-lucide="send"></i>Send test email to {{ smtp.notify }}</button></form>
 </div>
 {% endblock %}
