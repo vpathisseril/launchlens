@@ -201,6 +201,39 @@ def test_agent_follows_current_preferred_provider_unless_model_pinned(client):
     assert "OpenAI answer" in client.post("/hubs/pricing/ask", data=ask).text
 
 
+def test_claude_calls_omit_temperature_and_succeed(client):
+    ready_user(client)
+    tok = csrf(client, "/app")
+    assert "Citations verified" in _ask(client, tok)  # the fake Claude API rejects `temperature` like the real one
+
+
+def test_all_keys_fail_shows_preferred_cause_first_and_needs_credits_badge(client):
+    ready_user(client)
+    tok = csrf(client, "/app")
+    client.post("/onboarding/ai-keys/byok", data={"csrf_token": tok, "provider": "openai",
+                                                  "api_key": "sk-proj-good-5678", "back": "/account/ai"})
+    with dbmod.session_factory()() as s:
+        s.scalar(select(User).where(User.email == "ana@example.com")).preferred_provider = "anthropic"
+        s.commit()
+    PROVIDER_FAIL["anthropic"] = (400, {"error": {"message": "Your credit balance is too low"}})
+    PROVIDER_FAIL["openai"] = (429, {"error": {"code": "insufficient_quota", "message": "You exceeded your current quota"}})
+    html = _ask(client, tok)
+    assert "Anthropic Claude account needs credits" in html and "OpenAI: needs credits" in html
+    page = client.get("/account/ai").text
+    assert page.count("Needs credits ·") == 2
+    PROVIDER_FAIL.update(anthropic=None, openai=None)
+    _ask(client, tok)  # a successful call clears the flag
+    assert client.get("/account/ai").text.count("Needs credits ·") == 1
+
+
+def test_gemini_free_tier_429_is_a_limit_not_billing():
+    from app.agents.providers import classify
+    body = ('{"error":{"code":429,"message":"You exceeded your current quota, please check your plan and billing '
+            'details. Quota exceeded for metric: generate_content_free_tier_requests. Please retry in 37s."}}')
+    assert classify(429, body) == "quota"
+    assert classify(429, '{"error":{"code":"insufficient_quota"}}') == "billing"
+
+
 def test_key_update_workflow_after_rejection(client):
     ready_user(client)
     tok = csrf(client, "/app")
@@ -247,7 +280,7 @@ def test_brief_errors_are_friendly_and_offer_no_ai_summary(client):
     pid = _pin(client, tok)
     PROVIDER_FAIL["anthropic"] = (429, {"error": {"message": "Rate limited"}})
     r = client.post(f"/projects/{pid}/brief", data={"csrf_token": tok, "mode": "ai"})
-    assert "rate limit" in r.text and "Summary (no AI)" in r.text
+    assert "usage limit" in r.text and "Summary (no AI)" in r.text
 
 
 def test_brief_with_shared_key_quota(client):

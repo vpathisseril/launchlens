@@ -67,3 +67,7 @@ page, landing page, footer, sign-up terms and briefs all render from it.
 the `ADMIN_EMAIL` admin with that password, re-activates it, forces a password change at next sign-in, and writes an
 audit entry. It is applied once per secret value (hash stored), so later restarts don't undo the admin's new
 password. `python -m scripts.admin_recovery --list` shows admin emails.
+
+## ADR-018 — Provider-compatibility and fallback errors (2026-11-27)
+**Decision:** Never send `temperature` to Anthropic (current Claude models reject it); retry any provider once without it on a 400 that names it. On a personal-key auth/billing/quota failure, try every other saved key; if all fail, show the preferred provider's error first and list the others. Gemini free-tier 429s are "usage limit", not "needs credits". A billing failure flags the key "Needs credits" in Settings until the next successful call or a re-saved key.
+**Why:** a valid key can still fail on credits, and the user must see the real cause.

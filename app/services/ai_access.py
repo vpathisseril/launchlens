@@ -6,6 +6,7 @@ import re
 import time
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -100,6 +101,7 @@ def save_byok(db: Session, user: User, provider: str, raw_key: str, label: str =
     prefs = dict(user.preferred_models or {})
     prefs.setdefault(provider, {})
     prefs["available_" + provider] = rank_models(provider, models)
+    prefs["needs_credits"] = {p: d for p, d in (prefs.get("needs_credits") or {}).items() if p != provider}
     user.preferred_models = prefs
     audit(db, user.id, "byok_saved", "user_api_key", provider, after={"last4": row.key_last4})
     db.commit()
@@ -297,9 +299,55 @@ def _has_valid_key(db: Session, user: User) -> bool:
         UserApiKey.user_id == user.id, UserApiKey.is_valid.is_(True))) > 0
 
 
-def _other_valid_key(db: Session, user: User, provider: str) -> bool:
+FALLBACK_KINDS = ("auth", "billing", "quota")
+REASON = {"auth": "key was rejected", "billing": "account is out of credits", "quota": "account hit a usage limit"}
+
+
+def _other_valid_key(db: Session, user: User, exclude: set[str]) -> bool:
     return db.scalar(select(func.count()).select_from(UserApiKey).where(
-        UserApiKey.user_id == user.id, UserApiKey.is_valid.is_(True), UserApiKey.provider != provider)) > 0
+        UserApiKey.user_id == user.id, UserApiKey.is_valid.is_(True), UserApiKey.provider.not_in(exclude))) > 0
+
+
+def _note_failure(db: Session, user: User, provider: str, kind: str) -> None:
+    if kind == "auth":
+        _invalidate_key(db, user, provider)
+    elif kind == "billing":  # key is fine; remember so Settings can show "Needs credits"
+        prefs = dict(user.preferred_models or {})
+        prefs["needs_credits"] = {**(prefs.get("needs_credits") or {}), provider: utcnow().date().isoformat()}
+        user.preferred_models = prefs
+        db.commit()
+
+
+def _clear_credit_flag(user: User, provider: str) -> None:
+    flags = (user.preferred_models or {}).get("needs_credits") or {}
+    if provider in flags:
+        prefs = dict(user.preferred_models or {})
+        prefs["needs_credits"] = {p: d for p, d in flags.items() if p != provider}
+        user.preferred_models = prefs
+
+
+def _try_other_keys(db: Session, user: User, first: providers.ProviderError, exclude: set[str], system: str,
+                    user_msg: str, **kw: Any) -> tuple[str, UsageEvent, ResolvedAccess]:
+    """Try each remaining personal key once. If all fail, raise the FIRST (preferred provider's) error with the
+    others attached, so the user sees the real cause first."""
+    also: list[tuple[str, str]] = []
+    while _other_valid_key(db, user, exclude):
+        try:
+            text, ev, alt = llm_call(db, user, system, user_msg, _retry=False, _exclude=frozenset(exclude), **kw)
+        except providers.ProviderError as exc:
+            p = getattr(exc, "provider", "")
+            also.append((p, exc.kind))
+            exclude.add(p)
+            if exc.kind in FALLBACK_KINDS:
+                _note_failure(db, user, p, exc.kind)
+            continue
+        except NoAiAccess:
+            break
+        first_p = getattr(first, "provider", "")
+        alt.notice = f"Your {first_p} {REASON.get(first.kind, 'call failed')}, so your {alt.provider} key was used instead."
+        return text, ev, alt
+    first.also = also  # type: ignore[attr-defined]
+    raise first
 
 
 def _invalidate_key(db: Session, user: User, provider: str) -> None:
@@ -350,19 +398,14 @@ def llm_call(db: Session, user: User, system: str, user_msg: str, *, task: str =
                           latency_ms=int((time.monotonic() - t0) * 1000)))
         db.commit()
         exc.provider, exc.key_type, exc.model = access.provider, access.key_type, access.model  # type: ignore[attr-defined]
-        if access.key_type == "byok" and exc.kind == "auth" and _retry:
-            _invalidate_key(db, user, access.provider)
-            if _has_valid_key(db, user):  # transparently retry with the user's other key
-                return llm_call(db, user, system, user_msg, task=task, hub_key=hub_key, agent_id=agent_id,
-                                max_tokens=max_tokens, temperature=temperature, use_cache=use_cache, _retry=False)
-        out_of_credits = access.key_type == "byok" and exc.kind in ("billing", "quota") and _retry
-        if out_of_credits and _other_valid_key(db, user, access.provider):  # key is fine, account has no credits
-            text, ev, alt = llm_call(db, user, system, user_msg, task=task, hub_key=hub_key, agent_id=agent_id,
-                                     max_tokens=max_tokens, temperature=temperature, use_cache=use_cache,
-                                     _retry=False, _exclude=frozenset({access.provider}))
-            alt.notice = f"Your {access.provider} account is out of credits, so your {alt.provider} key was used instead."
-            return text, ev, alt
+        if access.key_type == "byok" and _retry and exc.kind in FALLBACK_KINDS:
+            _note_failure(db, user, access.provider, exc.kind)
+            return _try_other_keys(db, user, exc, set(_exclude) | {access.provider}, system, user_msg, task=task,
+                                   hub_key=hub_key, agent_id=agent_id, max_tokens=max_tokens,
+                                   temperature=temperature, use_cache=use_cache)
         raise
+    if access.key_type == "byok":
+        _clear_credit_flag(user, access.provider)
     ev = UsageEvent(user_id=user.id, agent_id=agent_id, hub_key=hub_key, provider=access.provider, model=access.model,
                     key_type=access.key_type, tokens_in=comp.tokens_in, tokens_out=comp.tokens_out,
                     est_cost_usd=estimate_cost(db, access.provider, access.model, comp.tokens_in, comp.tokens_out),

@@ -37,7 +37,21 @@ def for_model_choice(message: str) -> FriendlyError:
                          "Choose a model", "/account/ai#routing", "warn")
 
 
+SHORT_REASON = {"billing": "needs credits", "quota": "usage limit reached", "auth": "key rejected",
+                "model": "model unavailable"}
+
+
 def for_provider(exc: ProviderError, provider: str, key_type: str, model: str = "") -> FriendlyError:
+    """The preferred provider's error is the headline; any fallback keys that also failed are listed after it."""
+    fe = _for_provider(exc, provider, key_type, model)
+    also = getattr(exc, "also", None) or []
+    if also:
+        tried = "; ".join(f"{PROVIDER_LABELS.get(p, p)}: {SHORT_REASON.get(k, 'unavailable')}" for p, k in also)
+        fe.detail += f" Your other keys were also tried ({tried})."
+    return fe
+
+
+def _for_provider(exc: ProviderError, provider: str, key_type: str, model: str = "") -> FriendlyError:
     name = PROVIDER_LABELS.get(provider, provider)
     own = key_type == "byok"
     if exc.kind == "auth":
@@ -57,9 +71,10 @@ def for_provider(exc: ProviderError, provider: str, key_type: str, model: str = 
                              f"The shared key's provider account is out of credits. {ADD_KEY_STEPS}",
                              "Open AI access", "/account/ai", "err")
     if exc.kind == "quota":
-        return FriendlyError(f"{name} rate limit", (f"{name} is rate-limiting your account (a provider limit, not a "
-                             "LaunchLens limit). Wait a minute and try again, or raise your tier in the "
-                             f"{name} console." if own else f"The shared key is busy. Try again shortly. {ADD_KEY_STEPS}"),
+        return FriendlyError(f"{name} usage limit reached", (f"{name} has paused requests on your account because "
+                             "of a free-tier or per-minute limit (a provider limit, not a LaunchLens limit). Wait a "
+                             f"minute and try again, or enable billing / raise your tier in the {name} console." if own
+                             else f"The shared key is busy. Try again shortly. {ADD_KEY_STEPS}"),
                              "Open AI access", "/account/ai", "warn")
     if exc.kind == "model":
         return FriendlyError(f"Model not available: {model}" if model else "Model not available",

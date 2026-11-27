@@ -7,10 +7,12 @@
 {% if request.query_params.get('saved') %}<div class="alert ok">Saved.</div><br>{% endif %}
 {% if error %}<div class="alert err">{{ error }}</div><br>{% endif %}
 <div class="grid g3">
+  {% set nc = (user.preferred_models or {}).get('needs_credits') or {} %}
   {% for p in providers %}{% set k = keys.get(p) %}
   <div class="card">
     <div class="card-head"><h3><i data-lucide="cpu"></i>{{ labels[p] }}</h3><div class="spacer"></div>
-      {% if k and k.is_valid %}<span class="pill pill-ok">Valid · ••••{{ k.key_last4 }}</span>
+      {% if k and k.is_valid and p in nc %}<span class="pill pill-warn">Needs credits · ••••{{ k.key_last4 }}</span>
+      {% elif k and k.is_valid %}<span class="pill pill-ok">Valid · ••••{{ k.key_last4 }}</span>
       {% elif k %}<span class="pill pill-bad">Rejected · ••••{{ k.key_last4 }}</span>
       {% elif p in default_available %}<span class="pill pill-warn">Shared default</span>{% else %}<span class="pill">Not set</span>{% endif %}</div>
     {% if k and not k.is_valid %}
@@ -19,6 +21,7 @@
         <div class="field"><input name="api_key" type="password" placeholder="Paste new {{ labels[p] }} key" aria-label="New {{ labels[p] }} API key" required autocomplete="off"></div>
         <button class="btn sm primary"><i data-lucide="shield-check"></i>Validate & replace</button></form>
     {% elif k %}
+      {% if p in nc %}<p class="small" style="color:var(--warning)">The key is valid, but {{ labels[p] }} reported no credits on {{ nc[p] }}. Add credits in the {{ labels[p] }} billing console; this clears after the next successful call.</p>{% endif %}
       <p class="small muted">Validated {{ k.validated_at.strftime('%Y-%m-%d') if k.validated_at }} {{ ('· ' ~ k.label) if k.label }}</p>
       <form method="post" action="/account/ai/delete"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="provider" value="{{ p }}"><button class="btn sm danger"><i data-lucide="trash-2"></i>Remove key</button></form>
     {% else %}

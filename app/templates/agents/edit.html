@@ -22,7 +22,7 @@
         <div class="hint">On the shared key, only allowlisted models appear.</div></div>
       <div class="field"><label for="tone">Tone</label><select id="tone" name="tone">{% for t in tones %}<option {{ 'selected' if a.tone == t }}>{{ t }}</option>{% endfor %}</select></div>
       <div class="field"><label for="of">Output</label><select id="of" name="output_format">{% for f in formats %}<option {{ 'selected' if a.output_format == f }}>{{ f }}</option>{% endfor %}</select></div>
-      <div class="field"><label for="temp">Temperature</label><input id="temp" name="temperature" type="number" min="0" max="1" step="0.1" value="{{ a.temperature }}"></div>
+      <div class="field"><label for="temp">Temperature</label><input id="temp" name="temperature" type="number" min="0" max="1" step="0.1" value="{{ a.temperature }}" aria-describedby="temp-note"><div id="temp-note" class="tiny muted">Used by Google Gemini only. Anthropic and OpenAI models ignore it.</div></div>
       <div class="field"><label for="mt">Max output tokens</label><input id="mt" name="max_tokens" type="number" min="100" max="4000" step="50" value="{{ a.max_tokens }}"></div>
     </div>
     <h4>Tools (read-only data access)</h4>

@@ -219,6 +219,9 @@ def _fake_claude(request: httpx.Request) -> httpx.Response:
         st, body = PROVIDER_FAIL["anthropic"]
         return httpx.Response(st, json=body)
     body = json.loads(request.content)
+    if "temperature" in body:  # like the real API for current Claude models
+        return httpx.Response(400, json={"type": "error", "error": {
+            "type": "invalid_request_error", "message": "`temperature` is deprecated for this model."}})
     msg = body["messages"][0]["content"]
     if "Executive Launch Brief" in msg or "executive brief" in msg:
         text = "## Situation\nThe class is growing [1].\n## Risks\nNo pinned evidence yet."

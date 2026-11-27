@@ -26,6 +26,9 @@ def classify(status: int, body: str) -> str:
     low = body.lower()
     if status in (401, 403) or "invalid api key" in low or "invalid x-api-key" in low or "api key not valid" in low:
         return "auth"
+    if status == 429 and any(w in low for w in ("free_tier", "free tier", "per minute", "perminute", "retry in",
+                                                "retrydelay", "rate limit", "rate_limit")):
+        return "quota"
     if any(w in low for w in ("credit balance", "insufficient_quota", "billing", "exceeded your current quota",
                               "payment", "quota exceeded")) or status == 402:
         return "billing"
@@ -74,11 +77,22 @@ def list_models(provider: str, api_key: str) -> list[str]:
 
 
 def complete(provider: str, model: str, api_key: str, system: str, user_msg: str,
-             max_tokens: int = 800, temperature: float = 0.2) -> Completion:
+             max_tokens: int = 800, temperature: float | None = 0.2) -> Completion:
+    """One call. If a provider rejects an optional sampling setting (deprecated/unsupported), retry once without it."""
+    try:
+        return _complete(provider, model, api_key, system, user_msg, max_tokens, temperature)
+    except ProviderError as exc:
+        if temperature is None or exc.status != 400 or "temperature" not in str(exc).lower():
+            raise
+        return _complete(provider, model, api_key, system, user_msg, max_tokens, None)
+
+
+def _complete(provider: str, model: str, api_key: str, system: str, user_msg: str,
+              max_tokens: int, temperature: float | None) -> Completion:
     try:
         with _client() as c:
             if provider == "anthropic":
-                return _anthropic(c, model, api_key, system, user_msg, max_tokens, temperature)
+                return _anthropic(c, model, api_key, system, user_msg, max_tokens)
             if provider == "openai":
                 return _openai(c, model, api_key, system, user_msg, max_tokens)
             if provider == "google":
@@ -100,10 +114,9 @@ def _check(r: httpx.Response) -> dict:
     return r.json()
 
 
-def _anthropic(c: httpx.Client, model: str, key: str, system: str, user_msg: str, max_tokens: int,
-               temperature: float) -> Completion:
-    body = {
-        "model": model, "max_tokens": max_tokens, "temperature": temperature,
+def _anthropic(c: httpx.Client, model: str, key: str, system: str, user_msg: str, max_tokens: int) -> Completion:
+    body = {  # no temperature: current Claude models reject it (accuracy comes from the citation verifier)
+        "model": model, "max_tokens": max_tokens,
         # Long static guardrail prompt is cached by the provider (prompt caching) to cut cost.
         "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
         "messages": [{"role": "user", "content": user_msg}],
@@ -128,10 +141,12 @@ def _openai(c: httpx.Client, model: str, key: str, system: str, user_msg: str, m
 
 
 def _google(c: httpx.Client, model: str, key: str, system: str, user_msg: str, max_tokens: int,
-            temperature: float) -> Completion:
+            temperature: float | None) -> Completion:
+    gen: dict[str, float | int] = {"maxOutputTokens": max_tokens}
+    if temperature is not None:
+        gen["temperature"] = temperature
     body = {"systemInstruction": {"parts": [{"text": system}]},
-            "contents": [{"role": "user", "parts": [{"text": user_msg}]}],
-            "generationConfig": {"maxOutputTokens": max_tokens, "temperature": temperature}}
+            "contents": [{"role": "user", "parts": [{"text": user_msg}]}], "generationConfig": gen}
     r = c.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent", json=body,
                headers={"x-goog-api-key": key})
     data = _check(r)
