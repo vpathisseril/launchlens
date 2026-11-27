@@ -152,6 +152,33 @@ def test_rejected_key_falls_back_to_other_valid_key(client):
     assert "Rejected · ••••1234" in page and "Validate & replace" in page
 
 
+def test_out_of_credits_key_falls_back_to_other_key(client):
+    ready_user(client)
+    tok = csrf(client, "/app")
+    client.post("/onboarding/ai-keys/byok", data={"csrf_token": tok, "provider": "anthropic",
+                                                  "api_key": "sk-ant-good-1234", "back": "/account/ai"})
+    client.post("/onboarding/ai-keys/byok", data={"csrf_token": tok, "provider": "openai",
+                                                  "api_key": "sk-proj-good-5678", "back": "/account/ai"})
+    with dbmod.session_factory()() as s:
+        u = s.scalar(select(User).where(User.email == "ana@example.com"))
+        u.preferred_provider = "openai"
+        s.commit()
+    PROVIDER_FAIL["openai"] = (429, {"error": {"code": "insufficient_quota",
+                                               "message": "You exceeded your current quota"}})
+    html = _ask(client, tok)
+    assert "openai account is out of credits" in html and "Citations verified" in html
+    with dbmod.session_factory()() as s:  # the key is not marked rejected — it only needs credits
+        assert all(k.is_valid for k in s.scalars(select(UserApiKey)))
+
+
+def test_out_of_credits_single_key_shows_billing_guidance(client):
+    ready_user(client)
+    tok = csrf(client, "/app")
+    PROVIDER_FAIL["anthropic"] = (400, {"error": {"message": "Your credit balance is too low"}})
+    html = _ask(client, tok)
+    assert "credits" in html and 'href="/account/ai' in html
+
+
 def test_key_update_workflow_after_rejection(client):
     ready_user(client)
     tok = csrf(client, "/app")

@@ -184,7 +184,8 @@ class NeedsModelChoice(NoAiAccess):
 
 
 def resolve_access(db: Session, user: User, task: str = "answer", requested_model: str | None = None,
-                   requested_provider: str | None = None, max_tokens: int = 900) -> ResolvedAccess:
+                   requested_provider: str | None = None, max_tokens: int = 900,
+                   exclude: frozenset[str] = frozenset()) -> ResolvedAccess:
     """Picks key + model for a call.
 
     BYOK (unlimited): try the requested provider, then the user's preferred provider, then any other provider with a
@@ -195,7 +196,7 @@ def resolve_access(db: Session, user: User, task: str = "answer", requested_mode
     """
     keys = {k.provider: k for k in db.scalars(select(UserApiKey).where(UserApiKey.user_id == user.id,
                                                                        UserApiKey.is_valid.is_(True)))}
-    order = [p for p in (requested_provider, user.preferred_provider, *sorted(keys)) if p]
+    order = [p for p in (requested_provider, user.preferred_provider, *sorted(keys)) if p and p not in exclude]
     tried: list[str] = []
     for provider in dict.fromkeys(order):
         row = keys.get(provider)
@@ -296,6 +297,11 @@ def _has_valid_key(db: Session, user: User) -> bool:
         UserApiKey.user_id == user.id, UserApiKey.is_valid.is_(True))) > 0
 
 
+def _other_valid_key(db: Session, user: User, provider: str) -> bool:
+    return db.scalar(select(func.count()).select_from(UserApiKey).where(
+        UserApiKey.user_id == user.id, UserApiKey.is_valid.is_(True), UserApiKey.provider != provider)) > 0
+
+
 def _invalidate_key(db: Session, user: User, provider: str) -> None:
     """A provider rejected the key (401/403): stop using it; ask the user to update it only if nothing else works."""
     row = db.scalar(select(UserApiKey).where(UserApiKey.user_id == user.id, UserApiKey.provider == provider))
@@ -316,10 +322,10 @@ def estimate_cost(db: Session, provider: str, model: str, tin: int, tout: int) -
 
 def llm_call(db: Session, user: User, system: str, user_msg: str, *, task: str = "answer", hub_key: str = "",
              agent_id: int | None = None, model: str | None = None, provider: str | None = None,
-             max_tokens: int = 900, temperature: float = 0.2, use_cache: bool = True, _retry: bool = True
-             ) -> tuple[str, UsageEvent, ResolvedAccess]:
+             max_tokens: int = 900, temperature: float = 0.2, use_cache: bool = True, _retry: bool = True,
+             _exclude: frozenset[str] = frozenset()) -> tuple[str, UsageEvent, ResolvedAccess]:
     try:
-        access = resolve_access(db, user, task, model, provider, max_tokens)
+        access = resolve_access(db, user, task, model, provider, max_tokens, exclude=_exclude)
     except QuotaExceeded:
         db.add(UsageEvent(user_id=user.id, agent_id=agent_id, hub_key=hub_key, provider=provider or "-", model="-",
                           key_type="default", status="quota"))
@@ -349,6 +355,13 @@ def llm_call(db: Session, user: User, system: str, user_msg: str, *, task: str =
             if _has_valid_key(db, user):  # transparently retry with the user's other key
                 return llm_call(db, user, system, user_msg, task=task, hub_key=hub_key, agent_id=agent_id,
                                 max_tokens=max_tokens, temperature=temperature, use_cache=use_cache, _retry=False)
+        out_of_credits = access.key_type == "byok" and exc.kind in ("billing", "quota") and _retry
+        if out_of_credits and _other_valid_key(db, user, access.provider):  # key is fine, account has no credits
+            text, ev, alt = llm_call(db, user, system, user_msg, task=task, hub_key=hub_key, agent_id=agent_id,
+                                     max_tokens=max_tokens, temperature=temperature, use_cache=use_cache,
+                                     _retry=False, _exclude=frozenset({access.provider}))
+            alt.notice = f"Your {access.provider} account is out of credits, so your {alt.provider} key was used instead."
+            return text, ev, alt
         raise
     ev = UsageEvent(user_id=user.id, agent_id=agent_id, hub_key=hub_key, provider=access.provider, model=access.model,
                     key_type=access.key_type, tokens_in=comp.tokens_in, tokens_out=comp.tokens_out,
