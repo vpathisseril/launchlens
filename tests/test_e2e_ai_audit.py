@@ -179,6 +179,28 @@ def test_out_of_credits_single_key_shows_billing_guidance(client):
     assert "credits" in html and 'href="/account/ai' in html
 
 
+def test_agent_follows_current_preferred_provider_unless_model_pinned(client):
+    from app.models import Agent
+    ready_user(client)
+    tok = csrf(client, "/app")
+    client.post("/onboarding/ai-keys/byok", data={"csrf_token": tok, "provider": "openai",
+                                                  "api_key": "sk-proj-good-5678", "back": "/account/ai"})
+    with dbmod.session_factory()() as s:
+        u = s.scalar(select(User).where(User.email == "ana@example.com"))
+        u.preferred_provider = "anthropic"  # user switched after the agent was created with openai
+        a = Agent(owner_id=u.id, name="Old agent", provider="openai", model="", tools=[])
+        s.add(a)
+        s.commit()
+        aid = a.id
+    ask = {"csrf_token": tok, "question": Q, "agent_id": str(aid)}
+    html = client.post("/hubs/pricing/ask", data=ask).text
+    assert "OpenAI answer" not in html and "Citations verified" in html
+    with dbmod.session_factory()() as s:  # pinning a model pins its provider
+        s.get(Agent, aid).model = "gpt-5"
+        s.commit()
+    assert "OpenAI answer" in client.post("/hubs/pricing/ask", data=ask).text
+
+
 def test_key_update_workflow_after_rejection(client):
     ready_user(client)
     tok = csrf(client, "/app")

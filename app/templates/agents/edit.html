@@ -16,7 +16,7 @@
     <div class="field"><label for="persona">Persona</label><textarea id="persona" name="persona">{{ a.persona }}</textarea><div class="hint">Who the agent is: expertise and point of view.</div></div>
     <div class="field"><label for="goal">Goal</label><textarea id="goal" name="goal" style="min-height:70px">{{ a.goal }}</textarea></div>
     <div class="grid g4">
-      <div class="field"><label for="provider">Provider</label><select id="provider" name="provider">{% for p, ms in models.items() %}<option value="{{ p }}" {{ 'selected' if a.provider == p }}>{{ labels[p] }}</option>{% endfor %}</select></div>
+      <div class="field"><label for="provider">Provider</label><select id="provider" name="provider"><option value="" {{ 'selected' if not a.provider }}>My preferred provider ({{ labels.get(user.preferred_provider, user.preferred_provider) }})</option>{% for p, ms in models.items() %}<option value="{{ p }}" {{ 'selected' if a.provider == p }}>{{ labels[p] }}</option>{% endfor %}</select></div>
       <div class="field"><label for="model">Model</label><select id="model" name="model"><option value="">Default for task</option>
         {% for p, ms in models.items() %}<optgroup label="{{ labels[p] }}">{% for m in ms %}<option value="{{ m }}" {{ 'selected' if a.model == m }}>{{ m }}</option>{% endfor %}</optgroup>{% endfor %}</select>
         <div class="hint">On the shared key, only allowlisted models appear.</div></div>

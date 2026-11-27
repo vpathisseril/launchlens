@@ -171,9 +171,10 @@ def ask(db: Session, user: User, question: str, scope: dict[str, Any], hub_keys:
                   f"Format: {FORMAT.get(agent.output_format, '')}"
     scope_line = f"Scope: {json.dumps({k: v for k, v in scope.items() if v})}"
     user_msg = f"{scope_line}\n\nQUESTION: {question}\n\n{context}"
+    # The agent's provider applies only when it pins a model; otherwise follow the user's current preference.
     text, ev, access = ai_access.llm_call(
         db, user, system, user_msg, task="answer", hub_key=primary_hub, agent_id=agent.id if agent else None,
-        model=agent.model if agent and agent.model else None, provider=agent.provider if agent else None,
+        model=agent.model if agent and agent.model else None, provider=agent.provider if agent and agent.model else None,
         max_tokens=agent.max_tokens if agent else 900, temperature=agent.temperature if agent else 0.2)
     ok, notes = verify(text, context, question, len(cites))
     if not ok:  # one corrective retry

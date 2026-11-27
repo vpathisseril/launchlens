@@ -54,7 +54,7 @@ def clone(aid: int, user: User = Depends(require_module("agents")), db: Session 
     if not src or not (src.is_template or src.owner_id == user.id):
         raise HTTPException(404)
     a = Agent(owner_id=user.id, name=f"My {src.name}"[:80], icon=src.icon, hub_key=src.hub_key, persona=src.persona,
-              goal=src.goal, provider=user.preferred_provider or src.provider, model="", tone=src.tone,
+              goal=src.goal, provider="", model="", tone=src.tone,
               output_format=src.output_format, tools=list(src.tools), temperature=src.temperature,
               max_tokens=src.max_tokens)
     db.add(a)
@@ -85,7 +85,7 @@ async def save(request: Request, aid: int, user: User = Depends(require_module("
     a.tone = str(f.get("tone")) if f.get("tone") in TONE else a.tone
     a.output_format = str(f.get("output_format")) if f.get("output_format") in FORMAT else a.output_format
     prov = str(f.get("provider", a.provider))
-    a.provider = prov if prov in PROVIDERS else a.provider
+    a.provider = prov if prov in PROVIDERS or prov == "" else a.provider
     allowed = _model_choices(db, user).get(a.provider, [])
     m = str(f.get("model", ""))
     a.model = m if m in allowed else ""
